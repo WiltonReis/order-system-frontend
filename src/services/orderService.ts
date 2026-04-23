@@ -1,4 +1,4 @@
-import type { CreateOrderPayload, Order, Product } from "@/lib/types";
+import type { CreateOrderPayload, Order, Product, UpdateOrderPayload } from "@/lib/types";
 
 let mockOrders: Order[] = [
   {
@@ -26,20 +26,10 @@ let mockOrders: Order[] = [
   },
 ];
 
-/** Replace with: const { data } = await api.get<Order[]>("/orders"); return data; */
-export async function listOrders(): Promise<Order[]> {
-  await new Promise((r) => setTimeout(r, 200));
-  return [...mockOrders].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-/** Replace with: const { data } = await api.post<Order>("/orders", payload); return data; */
-export async function createOrder(
+function computeOrder(
   payload: CreateOrderPayload,
   products: Product[],
-  createdByName: string,
-): Promise<Order> {
-  await new Promise((r) => setTimeout(r, 300));
-
+) {
   const items = payload.items.map((it) => {
     const product = products.find((p) => p.id === it.productId);
     if (!product) throw new Error("Produto não encontrado");
@@ -51,14 +41,35 @@ export async function createOrder(
       subtotal: product.price * it.quantity,
     };
   });
-
   const subtotal = items.reduce((acc, it) => acc + it.subtotal, 0);
   const discount =
     payload.discountType === "PERCENT"
       ? subtotal * (payload.discountAmount / 100)
       : payload.discountAmount;
   const total = Math.max(0, subtotal - discount);
+  return { items, total };
+}
 
+/** Replace with: const { data } = await api.get<Order[]>("/orders"); return data; */
+export async function listOrders(): Promise<Order[]> {
+  await new Promise((r) => setTimeout(r, 200));
+  return [...mockOrders].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Replace with: const { data } = await api.get<Order>(`/orders/${id}`); return data; */
+export async function getOrder(id: string): Promise<Order | undefined> {
+  await new Promise((r) => setTimeout(r, 100));
+  return mockOrders.find((o) => o.id === id);
+}
+
+/** Replace with: const { data } = await api.post<Order>("/orders", payload); return data; */
+export async function createOrder(
+  payload: CreateOrderPayload,
+  products: Product[],
+  createdByName: string,
+): Promise<Order> {
+  await new Promise((r) => setTimeout(r, 300));
+  const { items, total } = computeOrder(payload, products);
   const order: Order = {
     id: `ORD-${1026 + mockOrders.length}`,
     createdAt: new Date().toISOString(),
@@ -70,4 +81,24 @@ export async function createOrder(
   };
   mockOrders = [order, ...mockOrders];
   return order;
+}
+
+/** Replace with: const { data } = await api.put<Order>(`/orders/${payload.id}`, payload); return data; */
+export async function updateOrder(
+  payload: UpdateOrderPayload,
+  products: Product[],
+): Promise<Order> {
+  await new Promise((r) => setTimeout(r, 300));
+  const idx = mockOrders.findIndex((o) => o.id === payload.id);
+  if (idx === -1) throw new Error("Pedido não encontrado");
+  const { items, total } = computeOrder(payload, products);
+  const updated: Order = {
+    ...mockOrders[idx],
+    items,
+    discountType: payload.discountType,
+    discountAmount: payload.discountAmount,
+    total,
+  };
+  mockOrders[idx] = updated;
+  return updated;
 }
