@@ -41,3 +41,7 @@ export interface CreateOrderPayload {
   discountType: "PERCENT" | "VALUE";
   discountAmount: number;
 }
+
+export interface UpdateOrderPayload extends CreateOrderPayload {
+  id: string;
+}

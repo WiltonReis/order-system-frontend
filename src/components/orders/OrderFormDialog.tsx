@@ -20,15 +20,18 @@ import {
 } from "@/components/ui/select";
 import { brl } from "@/lib/format";
 import { listProducts } from "@/services/productService";
-import { createOrder } from "@/services/orderService";
-import type { Product } from "@/lib/types";
+import { createOrder, updateOrder } from "@/services/orderService";
+import type { Order, Product } from "@/lib/types";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   createdByName: string;
-  onCreated: () => void;
+  onSaved: () => void;
+  /** When provided, dialog is in edit mode for this order */
+  order?: Order | null;
 }
 
 interface Line {
@@ -36,7 +39,11 @@ interface Line {
   quantity: number;
 }
 
-export function CreateOrderDialog({ open, onOpenChange, createdByName, onCreated }: Props) {
+export function OrderFormDialog({ open, onOpenChange, createdByName, onSaved, order }: Props) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
+  const isEdit = !!order;
+
   const [products, setProducts] = useState<Product[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<string>("");
@@ -47,11 +54,17 @@ export function CreateOrderDialog({ open, onOpenChange, createdByName, onCreated
   useEffect(() => {
     if (!open) return;
     listProducts().then(setProducts);
-    setLines([]);
     setSelectedProduct("");
-    setDiscountType("PERCENT");
-    setDiscountAmount(0);
-  }, [open]);
+    if (order) {
+      setLines(order.items.map((it) => ({ productId: it.productId, quantity: it.quantity })));
+      setDiscountType(order.discountType);
+      setDiscountAmount(order.discountAmount);
+    } else {
+      setLines([]);
+      setDiscountType("PERCENT");
+      setDiscountAmount(0);
+    }
+  }, [open, order]);
 
   const enrichedLines = useMemo(
     () =>
@@ -63,8 +76,9 @@ export function CreateOrderDialog({ open, onOpenChange, createdByName, onCreated
   );
 
   const subtotal = enrichedLines.reduce((acc, l) => acc + l.subtotal, 0);
+  const effectiveDiscountAmount = isAdmin ? discountAmount : 0;
   const discountValue =
-    discountType === "PERCENT" ? subtotal * (discountAmount / 100) : discountAmount;
+    discountType === "PERCENT" ? subtotal * (effectiveDiscountAmount / 100) : effectiveDiscountAmount;
   const total = Math.max(0, subtotal - discountValue);
 
   const addProduct = () => {
@@ -93,16 +107,22 @@ export function CreateOrderDialog({ open, onOpenChange, createdByName, onCreated
     }
     setSubmitting(true);
     try {
-      await createOrder(
-        { items: lines, discountType, discountAmount: Number(discountAmount) || 0 },
-        products,
-        createdByName,
-      );
-      toast.success("Pedido criado");
-      onCreated();
+      const payload = {
+        items: lines,
+        discountType,
+        discountAmount: isAdmin ? Number(discountAmount) || 0 : 0,
+      };
+      if (isEdit && order) {
+        await updateOrder({ id: order.id, ...payload }, products);
+        toast.success("Pedido atualizado");
+      } else {
+        await createOrder(payload, products, createdByName);
+        toast.success("Pedido criado");
+      }
+      onSaved();
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao criar pedido");
+      toast.error(e instanceof Error ? e.message : "Erro ao salvar pedido");
     } finally {
       setSubmitting(false);
     }
@@ -114,9 +134,9 @@ export function CreateOrderDialog({ open, onOpenChange, createdByName, onCreated
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Novo pedido</DialogTitle>
+          <DialogTitle>{isEdit ? `Editar pedido ${order?.id}` : "Novo pedido"}</DialogTitle>
           <DialogDescription>
-            Selecione produtos, ajuste quantidades e aplique desconto se necessário.
+            Selecione produtos, ajuste quantidades{isAdmin ? " e aplique desconto se necessário." : "."}
           </DialogDescription>
         </DialogHeader>
 
@@ -200,40 +220,44 @@ export function CreateOrderDialog({ open, onOpenChange, createdByName, onCreated
             )}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Tipo de desconto</Label>
-              <Select value={discountType} onValueChange={(v) => setDiscountType(v as "PERCENT" | "VALUE")}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PERCENT">Percentual (%)</SelectItem>
-                  <SelectItem value="VALUE">Valor (R$)</SelectItem>
-                </SelectContent>
-              </Select>
+          {isAdmin && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label>Tipo de desconto</Label>
+                <Select value={discountType} onValueChange={(v) => setDiscountType(v as "PERCENT" | "VALUE")}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PERCENT">Percentual (%)</SelectItem>
+                    <SelectItem value="VALUE">Valor (R$)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Desconto</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={discountAmount}
+                  onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                  placeholder={discountType === "PERCENT" ? "0%" : "R$ 0,00"}
+                />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Desconto</Label>
-              <Input
-                type="number"
-                min={0}
-                value={discountAmount}
-                onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
-                placeholder={discountType === "PERCENT" ? "0%" : "R$ 0,00"}
-              />
-            </div>
-          </div>
+          )}
 
           <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm">
             <div className="flex justify-between text-muted-foreground">
               <span>Subtotal</span>
               <span className="tabular-nums">{brl(subtotal)}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>Desconto</span>
-              <span className="tabular-nums">- {brl(discountValue)}</span>
-            </div>
+            {isAdmin && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Desconto</span>
+                <span className="tabular-nums">- {brl(discountValue)}</span>
+              </div>
+            )}
             <div className="mt-2 flex justify-between border-t border-border pt-2 text-base font-semibold">
               <span>Total</span>
               <span className="tabular-nums text-primary">{brl(total)}</span>
@@ -246,7 +270,7 @@ export function CreateOrderDialog({ open, onOpenChange, createdByName, onCreated
             Cancelar
           </Button>
           <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting ? "Criando..." : "Criar pedido"}
+            {submitting ? "Salvando..." : isEdit ? "Salvar alterações" : "Criar pedido"}
           </Button>
         </DialogFooter>
       </DialogContent>
