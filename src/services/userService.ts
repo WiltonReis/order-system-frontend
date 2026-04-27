@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import type { Role, User } from "@/lib/types";
+import type { PageResponse, Role, User } from "@/lib/types";
 
 interface BackendUserResponse {
   id: string;
@@ -11,9 +11,14 @@ function mapUser(u: BackendUserResponse): User {
   return { id: u.id, name: u.username, username: u.username, role: u.role };
 }
 
-export async function listUsers(): Promise<User[]> {
-  const { data } = await api.get<BackendUserResponse[]>("/users");
-  return data.map(mapUser);
+export async function listUsers(page = 0, size = 20): Promise<PageResponse<User>> {
+  const { data } = await api.get<PageResponse<BackendUserResponse>>(
+    `/users?page=${page}&size=${size}`,
+  );
+  return {
+    ...data,
+    content: data.content.map(mapUser),
+  };
 }
 
 export async function createUser(input: { name: string; username: string; password: string; role: Role }): Promise<User> {

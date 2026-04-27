@@ -4,6 +4,7 @@ import type {
   Order,
   OrderItem,
   OrderStatus,
+  PageResponse,
   Product,
   UpdateOrderPayload,
 } from "@/lib/types";
@@ -30,14 +31,6 @@ interface BackendOrderDetail {
   customerName?: string | null;
   completedByUsername?: string | null;
   canceledByUsername?: string | null;
-}
-
-interface BackendOrderSummary {
-  id: string;
-  status: string;
-  total: number;
-  createdAt: string;
-  user: { id: string; username: string };
 }
 
 function mapItem(item: BackendOrderItem): OrderItem {
@@ -83,14 +76,15 @@ function computeDiscountValue(
   return discountType === "PERCENT" ? subtotal * (discountAmount / 100) : discountAmount;
 }
 
-export async function listOrders(): Promise<Order[]> {
-  const { data: summaries } = await api.get<BackendOrderSummary[]>("/orders");
-  const details = await Promise.all(
-    summaries.map((s) => api.get<BackendOrderDetail>(`/orders/${s.id}`)),
+// PERF-01 + PERF-02: busca paginada com detalhes completos (sem N+1)
+export async function listOrders(page = 0, size = 20): Promise<PageResponse<Order>> {
+  const { data } = await api.get<PageResponse<BackendOrderDetail>>(
+    `/orders/details?page=${page}&size=${size}`,
   );
-  return details
-    .map((r) => mapDetail(r.data))
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return {
+    ...data,
+    content: data.content.map(mapDetail),
+  };
 }
 
 export async function getOrder(id: string): Promise<Order | undefined> {

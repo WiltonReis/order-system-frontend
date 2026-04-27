@@ -1,5 +1,5 @@
 import { api } from "@/lib/api";
-import type { Product } from "@/lib/types";
+import type { PageResponse, Product } from "@/lib/types";
 
 interface BackendProduct {
   id: string;
@@ -19,9 +19,21 @@ function mapProduct(p: BackendProduct): Product {
   };
 }
 
+// Retorna todos os produtos sem paginação — usada pelo OrderFormDialog (dropdown de seleção)
 export async function listProducts(): Promise<Product[]> {
-  const { data } = await api.get<BackendProduct[]>("/products");
+  const { data } = await api.get<BackendProduct[]>("/products/all");
   return data.map(mapProduct);
+}
+
+// Versão paginada — usada pela tela de gerenciamento de produtos
+export async function listProductsPaged(page = 0, size = 20): Promise<PageResponse<Product>> {
+  const { data } = await api.get<PageResponse<BackendProduct>>(
+    `/products?page=${page}&size=${size}`,
+  );
+  return {
+    ...data,
+    content: data.content.map(mapProduct),
+  };
 }
 
 export async function createProduct(input: {

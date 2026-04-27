@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { CheckCircle2, Eye, Pencil, Plus, ShoppingCart, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Eye, Pencil, Plus, ShoppingCart, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +46,9 @@ function OrdersPage() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [loadKey, setLoadKey] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
@@ -56,18 +59,25 @@ function OrdersPage() {
     (o) => o.status === "COMPLETED" || o.status === "CANCELED",
   );
 
-  const refresh = async () => {
-    setLoading(true);
-    try {
-      setOrders(await listOrders());
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    refresh();
-  }, []);
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const result = await listOrders(page);
+        if (!cancelled) {
+          setOrders(result.content);
+          setTotalPages(result.totalPages);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [page, loadKey]);
+
+  const refresh = () => setLoadKey((k) => k + 1);
 
   const openCreate = () => {
     setActiveOrder(null);
@@ -115,6 +125,32 @@ function OrdersPage() {
     </div>
   );
 
+  const pagination = totalPages > 1 && (
+    <div className="flex items-center justify-center gap-3 border-t p-3">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 p-0"
+        disabled={page === 0}
+        onClick={() => setPage((p) => p - 1)}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <span className="text-sm text-muted-foreground">
+        {page + 1} / {totalPages}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 p-0"
+        disabled={page >= totalPages - 1}
+        onClick={() => setPage((p) => p + 1)}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className="space-y-6">
@@ -133,22 +169,8 @@ function OrdersPage() {
 
         <Tabs defaultValue="active">
           <TabsList>
-            <TabsTrigger value="active">
-              Ativos
-              {!loading && activeOrders.length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
-                  {activeOrders.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="history">
-              Histórico
-              {!loading && historyOrders.length > 0 && (
-                <Badge variant="secondary" className="ml-1.5 h-4 px-1.5 text-[10px]">
-                  {historyOrders.length}
-                </Badge>
-              )}
-            </TabsTrigger>
+            <TabsTrigger value="active">Ativos</TabsTrigger>
+            <TabsTrigger value="history">Histórico</TabsTrigger>
           </TabsList>
 
           {/* ── Active orders tab ── */}
@@ -159,35 +181,139 @@ function OrdersPage() {
               ) : activeOrders.length === 0 ? (
                 emptyState("Nenhum pedido ativo.")
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead>Pedido</TableHead>
-                      <TableHead>Criado em</TableHead>
-                      <TableHead>Usuário</TableHead>
-                      <TableHead className="text-center">Itens</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="w-[152px] text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {activeOrders.map((o) => (
-                      <TableRow key={o.id}>
-                        <TableCell className="font-mono text-sm font-semibold">
-                          #{o.orderCode}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {dateTime(o.createdAt)}
-                        </TableCell>
-                        <TableCell className="text-sm">{o.createdByName}</TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary">{o.items.length}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums text-primary">
-                          {brl(o.total)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Pedido</TableHead>
+                        <TableHead>Criado em</TableHead>
+                        <TableHead>Usuário</TableHead>
+                        <TableHead className="text-center">Itens</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="w-[152px] text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {activeOrders.map((o) => (
+                        <TableRow key={o.id}>
+                          <TableCell className="font-mono text-sm font-semibold">
+                            #{o.orderCode}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {dateTime(o.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-sm">{o.createdByName}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary">{o.items.length}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold tabular-nums text-primary">
+                            {brl(o.total)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-1">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8"
+                                    onClick={() => openDetails(o)}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Visualizar pedido</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 hover:text-primary"
+                                    onClick={() => openEdit(o)}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Editar pedido</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 hover:text-green-600"
+                                    onClick={() => setConfirmAction({ type: "finalize", order: o })}
+                                  >
+                                    <CheckCircle2 className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Finalizar pedido</TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 hover:text-destructive"
+                                    onClick={() => setConfirmAction({ type: "cancel", order: o })}
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Cancelar pedido</TooltipContent>
+                              </Tooltip>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {pagination}
+                </>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* ── History tab ── */}
+          <TabsContent value="history">
+            <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+              {loading ? (
+                <div className="p-10 text-center text-sm text-muted-foreground">Carregando...</div>
+              ) : historyOrders.length === 0 ? (
+                emptyState("Nenhum pedido no histórico.")
+              ) : (
+                <>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead>Pedido</TableHead>
+                        <TableHead>Criado em</TableHead>
+                        <TableHead>Usuário</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-center">Itens</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
+                        <TableHead className="w-[60px] text-right">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {historyOrders.map((o) => (
+                        <TableRow key={o.id} className="opacity-80">
+                          <TableCell className="font-mono text-sm font-semibold">#{o.orderCode}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground">
+                            {dateTime(o.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-sm">{o.createdByName}</TableCell>
+                          <TableCell>
+                            <OrderStatusBadge status={o.status} />
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary">{o.items.length}</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-semibold tabular-nums text-primary">
+                            {brl(o.total)}
+                          </TableCell>
+                          <TableCell className="text-right">
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button
@@ -201,111 +327,13 @@ function OrdersPage() {
                               </TooltipTrigger>
                               <TooltipContent>Visualizar pedido</TooltipContent>
                             </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 hover:text-primary"
-                                  onClick={() => openEdit(o)}
-                                >
-                                  <Pencil className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Editar pedido</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 hover:text-green-600"
-                                  onClick={() => setConfirmAction({ type: "finalize", order: o })}
-                                >
-                                  <CheckCircle2 className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Finalizar pedido</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8 hover:text-destructive"
-                                  onClick={() => setConfirmAction({ type: "cancel", order: o })}
-                                >
-                                  <XCircle className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Cancelar pedido</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* ── History tab ── */}
-          <TabsContent value="history">
-            <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-              {loading ? (
-                <div className="p-10 text-center text-sm text-muted-foreground">Carregando...</div>
-              ) : historyOrders.length === 0 ? (
-                emptyState("Nenhum pedido no histórico.")
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead>Pedido</TableHead>
-                      <TableHead>Criado em</TableHead>
-                      <TableHead>Usuário</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-center">Itens</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="w-[60px] text-right">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {historyOrders.map((o) => (
-                      <TableRow key={o.id} className="opacity-80">
-                        <TableCell className="font-mono text-sm font-semibold">#{o.orderCode}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {dateTime(o.createdAt)}
-                        </TableCell>
-                        <TableCell className="text-sm">{o.createdByName}</TableCell>
-                        <TableCell>
-                          <OrderStatusBadge status={o.status} />
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary">{o.items.length}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-semibold tabular-nums text-primary">
-                          {brl(o.total)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8"
-                                onClick={() => openDetails(o)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Visualizar pedido</TooltipContent>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                  {pagination}
+                </>
               )}
             </div>
           </TabsContent>
