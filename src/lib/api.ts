@@ -1,29 +1,37 @@
 import axios from "axios";
 
-/**
- * Axios instance configured for the future Spring Boot backend.
- * Set VITE_API_URL in your env when ready to plug the real API.
- */
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
   headers: { "Content-Type": "application/json" },
+  // Envia o cookie httpOnly automaticamente em todas as requisições
+  withCredentials: true,
 });
 
-const TOKEN_KEY = "oms.token";
+const USER_KEY = "oms.user";
 
-export const tokenStorage = {
-  get: () => (typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null),
-  set: (token: string) => localStorage.setItem(TOKEN_KEY, token),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
+// Armazena apenas dados de display do usuário (não o token — ele fica no cookie httpOnly)
+export const userStorage = {
+  get: (): unknown | null => {
+    if (typeof window === "undefined") return null;
+    const raw = localStorage.getItem(USER_KEY);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  },
+  set: (user: unknown) => localStorage.setItem(USER_KEY, JSON.stringify(user)),
+  clear: () => localStorage.removeItem(USER_KEY),
 };
 
-api.interceptors.request.use((config) => {
-  const token = tokenStorage.get();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// Redireciona para login quando o token expira (401) ou sessão é inválida
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (axios.isAxiosError(err) && err.response?.status === 401) {
+      userStorage.clear();
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  },
+);
 
 /**
  * Extrai a mensagem de erro do backend a partir de erros Axios ou genéricos.

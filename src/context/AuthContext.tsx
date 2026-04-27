@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { tokenStorage } from "@/lib/api";
-import { login as loginRequest } from "@/services/authService";
+import { userStorage } from "@/lib/api";
+import { login as loginRequest, logout as logoutRequest } from "@/services/authService";
 import type { User } from "@/lib/types";
 
 interface AuthContextValue {
@@ -13,37 +13,32 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const USER_KEY = "oms.user";
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = tokenStorage.get();
-    const raw = typeof window !== "undefined" ? localStorage.getItem(USER_KEY) : null;
-    if (token && raw) {
-      try {
-        setUser(JSON.parse(raw) as User);
-      } catch {
-        tokenStorage.clear();
-        localStorage.removeItem(USER_KEY);
-      }
+    // Restaura dados de display do usuário do localStorage.
+    // O cookie httpOnly (token) é enviado automaticamente pelo browser —
+    // se expirar, o interceptor de 401 limpa o estado e redireciona para /login.
+    const stored = userStorage.get();
+    if (stored) {
+      setUser(stored as User);
     }
     setLoading(false);
   }, []);
 
   const login = async (username: string, password: string) => {
-    const { token, user } = await loginRequest(username, password);
-    tokenStorage.set(token);
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    const { user } = await loginRequest(username, password);
+    userStorage.set(user);
     setUser(user);
   };
 
   const logout = () => {
-    tokenStorage.clear();
-    localStorage.removeItem(USER_KEY);
+    // Limpa estado local imediatamente e sinaliza ao backend para expirar o cookie
+    userStorage.clear();
     setUser(null);
+    logoutRequest().catch(() => {});
   };
 
   return (
