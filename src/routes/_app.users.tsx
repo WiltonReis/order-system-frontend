@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
-import { Plus, Trash2, Users as UsersIcon } from "lucide-react";
+import { Pencil, Plus, Trash2, Users as UsersIcon } from "lucide-react";
+import { extractErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,6 +35,7 @@ import {
   createUser,
   deleteUser,
   listUsers,
+  updateUser,
   updateUserRole,
 } from "@/services/userService";
 import type { Role, User } from "@/lib/types";
@@ -49,9 +51,15 @@ function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState("");
   const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<Role>("USER");
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const [editUsername, setEditUsername] = useState("");
+  const [editPassword, setEditPassword] = useState("");
+  const [editRole, setEditRole] = useState<Role>("USER");
 
   const refresh = async () => {
     setLoading(true);
@@ -69,30 +77,74 @@ function UsersPage() {
   if (user && user.role !== "ADMIN") return <Navigate to="/orders" />;
 
   const handleRoleChange = async (id: string, role: Role) => {
-    await updateUserRole(id, role);
-    toast.success("Permissão atualizada");
-    refresh();
+    try {
+      await updateUserRole(id, role);
+      toast.success("Permissão atualizada");
+      refresh();
+    } catch (e) {
+      toast.error(extractErrorMessage(e, "Erro ao atualizar permissão"));
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Excluir este usuário?")) return;
-    await deleteUser(id);
-    toast.success("Usuário excluído");
-    refresh();
+    try {
+      await deleteUser(id);
+      toast.success("Usuário excluído");
+      refresh();
+    } catch (e) {
+      toast.error(extractErrorMessage(e, "Erro ao excluir usuário"));
+    }
   };
 
   const handleCreate = async () => {
-    if (!newName.trim() || !newUsername.trim()) {
-      toast.error("Preencha nome e usuário");
+    if (!newUsername.trim()) {
+      toast.error("Preencha o nome de usuário");
       return;
     }
-    await createUser({ name: newName.trim(), username: newUsername.trim(), role: newRole });
-    toast.success("Usuário criado");
-    setNewName("");
-    setNewUsername("");
-    setNewRole("USER");
-    setCreateOpen(false);
-    refresh();
+    if (!newPassword.trim()) {
+      toast.error("Preencha a senha");
+      return;
+    }
+    try {
+      await createUser({ name: newUsername.trim(), username: newUsername.trim(), password: newPassword, role: newRole });
+      toast.success("Usuário criado");
+      setNewUsername("");
+      setNewPassword("");
+      setNewRole("USER");
+      setCreateOpen(false);
+      refresh();
+    } catch (e) {
+      toast.error(extractErrorMessage(e, "Erro ao criar usuário"));
+    }
+  };
+
+  const openEdit = (u: User) => {
+    setEditUser(u);
+    setEditUsername(u.username);
+    setEditPassword("");
+    setEditRole(u.role);
+    setEditOpen(true);
+  };
+
+  const handleEdit = async () => {
+    if (!editUser) return;
+    if (!editUsername.trim()) {
+      toast.error("Preencha o nome de usuário");
+      return;
+    }
+    try {
+      await updateUser(editUser.id, {
+        username: editUsername.trim(),
+        password: editPassword || undefined,
+        role: editRole,
+      });
+      toast.success("Usuário atualizado");
+      setEditOpen(false);
+      refresh();
+    } catch (e) {
+      toast.error(extractErrorMessage(e, "Erro ao atualizar usuário"));
+    }
   };
 
   return (
@@ -126,7 +178,7 @@ function UsersPage() {
                   <TableHead>Nome</TableHead>
                   <TableHead>Usuário</TableHead>
                   <TableHead className="w-[180px]">Permissão</TableHead>
-                  <TableHead className="w-[100px] text-right">Ações</TableHead>
+                  <TableHead className="w-[120px] text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -155,20 +207,35 @@ function UsersPage() {
                       </Select>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                            onClick={() => handleDelete(u.id)}
-                            disabled={u.id === user?.id}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Excluir usuário</TooltipContent>
-                      </Tooltip>
+                      <div className="flex justify-end gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 hover:text-primary"
+                              onClick={() => openEdit(u)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Editar usuário</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              onClick={() => handleDelete(u.id)}
+                              disabled={u.id === user?.id}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Excluir usuário</TooltipContent>
+                        </Tooltip>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -185,12 +252,12 @@ function UsersPage() {
             </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Nome completo</Label>
-                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ex: Maria Silva" />
-              </div>
-              <div className="space-y-1.5">
                 <Label>Usuário (login)</Label>
                 <Input value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="ex: maria" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Senha</Label>
+                <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="••••••" />
               </div>
               <div className="space-y-1.5">
                 <Label>Permissão</Label>
@@ -208,6 +275,48 @@ function UsersPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
               <Button onClick={handleCreate}>Criar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar usuário</DialogTitle>
+              <DialogDescription>
+                Altere os dados do usuário. Deixe a senha em branco para mantê-la.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1.5">
+                <Label>Usuário (login)</Label>
+                <Input value={editUsername} onChange={(e) => setEditUsername(e.target.value)} placeholder="ex: maria" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Nova senha (opcional)</Label>
+                <Input
+                  type="password"
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="Deixe em branco para não alterar"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Permissão</Label>
+                <Select value={editRole} onValueChange={(v) => setEditRole(v as Role)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USER">USER</SelectItem>
+                    <SelectItem value="ADMIN">ADMIN</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+              <Button onClick={handleEdit}>Salvar</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

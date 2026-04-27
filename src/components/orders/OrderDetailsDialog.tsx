@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { brl, dateTime } from "@/lib/format";
 import type { Order } from "@/lib/types";
+import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 
 interface Props {
   open: boolean;
@@ -21,16 +22,17 @@ export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
   if (!order) return null;
 
   const subtotal = order.items.reduce((acc, it) => acc + it.subtotal, 0);
-  const discountValue =
-    order.discountType === "PERCENT"
-      ? subtotal * (order.discountAmount / 100)
-      : order.discountAmount;
+  // O backend sempre armazena e retorna o desconto como valor absoluto
+  const discountValue = order.discountAmount;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle className="font-mono">{order.id}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <span className="font-mono">#{order.orderCode || order.id}</span>
+            <OrderStatusBadge status={order.status} />
+          </DialogTitle>
           <DialogDescription>Detalhes completos do pedido</DialogDescription>
         </DialogHeader>
 
@@ -44,6 +46,36 @@ export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
               <div className="text-xs text-muted-foreground">Criado por</div>
               <div className="font-medium">{order.createdByName}</div>
             </div>
+            {order.customerName && (
+              <div>
+                <div className="text-xs text-muted-foreground">Cliente</div>
+                <div className="font-medium">{order.customerName}</div>
+              </div>
+            )}
+            {order.completedAt && (
+              <div>
+                <div className="text-xs text-muted-foreground">Finalizado em</div>
+                <div className="font-medium">{dateTime(order.completedAt)}</div>
+              </div>
+            )}
+            {order.completedByUsername && (
+              <div>
+                <div className="text-xs text-muted-foreground">Finalizado por</div>
+                <div className="font-medium">{order.completedByUsername}</div>
+              </div>
+            )}
+            {order.canceledAt && (
+              <div>
+                <div className="text-xs text-muted-foreground">Cancelado em</div>
+                <div className="font-medium">{dateTime(order.canceledAt)}</div>
+              </div>
+            )}
+            {order.canceledByUsername && (
+              <div>
+                <div className="text-xs text-muted-foreground">Cancelado por</div>
+                <div className="font-medium">{order.canceledByUsername}</div>
+              </div>
+            )}
           </div>
 
           <div>
@@ -71,12 +103,12 @@ export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
               <span>Subtotal</span>
               <span className="tabular-nums">{brl(subtotal)}</span>
             </div>
-            <div className="flex justify-between text-muted-foreground">
-              <span>
-                Desconto {order.discountType === "PERCENT" ? `(${order.discountAmount}%)` : ""}
-              </span>
-              <span className="tabular-nums">- {brl(discountValue)}</span>
-            </div>
+            {discountValue > 0 && (
+              <div className="flex justify-between text-muted-foreground">
+                <span>Desconto</span>
+                <span className="tabular-nums">- {brl(discountValue)}</span>
+              </div>
+            )}
             <div className="mt-2 flex justify-between border-t border-border pt-2 text-base font-semibold">
               <span>Total</span>
               <span className="tabular-nums text-primary">{brl(order.total)}</span>

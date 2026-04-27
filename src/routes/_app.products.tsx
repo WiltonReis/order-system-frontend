@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { createFileRoute, Navigate } from "@tanstack/react-router";
-import { Check, Package, Pencil, Plus, Trash2, X } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Eye, Package, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -23,12 +24,14 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/context/AuthContext";
 import { brl } from "@/lib/format";
+import { extractErrorMessage } from "@/lib/api";
 import {
   createProduct,
   deleteProduct,
   listProducts,
-  updateProductPrice,
+  updateProduct,
 } from "@/services/productService";
+import { ProductDetailsDialog } from "@/components/orders/ProductDetailsDialog";
 import type { Product } from "@/lib/types";
 import { toast } from "sonner";
 
@@ -39,13 +42,27 @@ export const Route = createFileRoute("/_app/products")({
 
 function ProductsPage() {
   const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingPrice, setEditingPrice] = useState<string>("");
+
+  // Estado do dialog de criação
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newDescription, setNewDescription] = useState("");
   const [newPrice, setNewPrice] = useState("");
+
+  // Estado do dialog de visualização
+  const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  // Estado do dialog de edição completa
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Product | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editPrice, setEditPrice] = useState("");
 
   const refresh = async () => {
     setLoading(true);
@@ -60,34 +77,48 @@ function ProductsPage() {
     refresh();
   }, []);
 
-  if (user && user.role !== "ADMIN") return <Navigate to="/orders" />;
-
-  const startEdit = (p: Product) => {
-    setEditingId(p.id);
-    setEditingPrice(String(p.price));
+  const openDetails = (p: Product) => {
+    setDetailsProduct(p);
+    setDetailsOpen(true);
   };
 
-  const saveEdit = async (id: string) => {
-    const price = parseFloat(editingPrice);
-    if (isNaN(price) || price < 0) {
-      toast.error("Preço inválido");
+  const openEdit = (p: Product) => {
+    setEditTarget(p);
+    setEditName(p.name);
+    setEditDescription(p.description ?? "");
+    setEditPrice(String(p.price));
+    setEditOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    const price = parseFloat(editPrice);
+    if (!editName.trim() || isNaN(price) || price < 0) {
+      toast.error("Preencha nome e preço válidos");
       return;
     }
     try {
-      await updateProductPrice(id, price);
-      toast.success("Preço atualizado");
-      setEditingId(null);
+      await updateProduct(editTarget!.id, {
+        name: editName.trim(),
+        description: editDescription.trim(),
+        price,
+      });
+      toast.success("Produto atualizado");
+      setEditOpen(false);
       refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao atualizar");
+      toast.error(extractErrorMessage(e, "Erro ao atualizar produto"));
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir este produto?")) return;
-    await deleteProduct(id);
-    toast.success("Produto excluído");
-    refresh();
+    try {
+      await deleteProduct(id);
+      toast.success("Produto excluído");
+      refresh();
+    } catch (e) {
+      toast.error(extractErrorMessage(e, "Erro ao excluir produto"));
+    }
   };
 
   const handleCreate = async () => {
@@ -96,12 +127,17 @@ function ProductsPage() {
       toast.error("Preencha nome e preço válidos");
       return;
     }
-    await createProduct({ name: newName.trim(), price });
-    toast.success("Produto criado");
-    setNewName("");
-    setNewPrice("");
-    setCreateOpen(false);
-    refresh();
+    try {
+      await createProduct({ name: newName.trim(), description: newDescription.trim(), price });
+      toast.success("Produto criado");
+      setNewName("");
+      setNewDescription("");
+      setNewPrice("");
+      setCreateOpen(false);
+      refresh();
+    } catch (e) {
+      toast.error(extractErrorMessage(e, "Erro ao criar produto"));
+    }
   };
 
   return (
@@ -111,13 +147,15 @@ function ProductsPage() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Produtos</h1>
             <p className="text-sm text-muted-foreground">
-              Gerencie o catálogo e ajuste preços.
+              {isAdmin ? "Gerencie o catálogo e ajuste preços." : "Consulte o catálogo de produtos."}
             </p>
           </div>
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Novo produto
-          </Button>
+          {isAdmin && (
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Novo produto
+            </Button>
+          )}
         </div>
 
         <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
@@ -138,98 +176,159 @@ function ProductsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {products.map((p) => {
-                  const editing = editingId === p.id;
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.name}</TableCell>
-                      <TableCell className="text-right">
-                        {editing ? (
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={editingPrice}
-                            onChange={(e) => setEditingPrice(e.target.value)}
-                            className="ml-auto h-8 w-32 text-right tabular-nums"
-                            autoFocus
-                          />
-                        ) : (
-                          <span className="tabular-nums font-semibold text-primary">{brl(p.price)}</span>
+                {products.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell className="text-right">
+                      <span className="tabular-nums font-semibold text-primary">{brl(p.price)}</span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              onClick={() => openDetails(p)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Ver detalhes</TooltipContent>
+                        </Tooltip>
+                        {isAdmin && (
+                          <>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 hover:text-primary"
+                                  onClick={() => openEdit(p)}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Editar produto</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  onClick={() => handleDelete(p.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Excluir produto</TooltipContent>
+                            </Tooltip>
+                          </>
                         )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          {editing ? (
-                            <>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary" onClick={() => saveEdit(p.id)}>
-                                    <Check className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Salvar</TooltipContent>
-                              </Tooltip>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setEditingId(null)}>
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Cancelar</TooltipContent>
-                              </Tooltip>
-                            </>
-                          ) : (
-                            <>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary" onClick={() => startEdit(p)}>
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Editar preço</TooltipContent>
-                              </Tooltip>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(p.id)}>
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Excluir produto</TooltipContent>
-                              </Tooltip>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           )}
         </div>
 
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Novo produto</DialogTitle>
-              <DialogDescription>Cadastre um novo item no catálogo.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label>Nome</Label>
-                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Ex: Notebook Pro 14" />
+        {/* Dialog de criação */}
+        {isAdmin && (
+          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo produto</DialogTitle>
+                <DialogDescription>Cadastre um novo item no catálogo.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Nome</Label>
+                  <Input
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="Ex: Notebook Pro 14"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Descrição (opcional)</Label>
+                  <Textarea
+                    value={newDescription}
+                    onChange={(e) => setNewDescription(e.target.value)}
+                    placeholder="Descreva o produto em até 200 caracteres"
+                    maxLength={200}
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Preço (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={newPrice}
+                    onChange={(e) => setNewPrice(e.target.value)}
+                    placeholder="0,00"
+                  />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Preço (R$)</Label>
-                <Input type="number" step="0.01" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="0,00" />
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
+                <Button onClick={handleCreate}>Criar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Dialog de edição completa (nome, descrição, preço) */}
+        {isAdmin && (
+          <Dialog open={editOpen} onOpenChange={setEditOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Editar produto</DialogTitle>
+                <DialogDescription>Atualize as informações do produto.</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label>Nome</Label>
+                  <Input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Ex: Notebook Pro 14"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Descrição (opcional)</Label>
+                  <Textarea
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="Descreva o produto em até 200 caracteres"
+                    maxLength={200}
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Preço (R$)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editPrice}
+                    onChange={(e) => setEditPrice(e.target.value)}
+                    placeholder="0,00"
+                  />
+                </div>
               </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-              <Button onClick={handleCreate}>Criar</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
+                <Button onClick={handleSaveEdit}>Salvar</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        <ProductDetailsDialog open={detailsOpen} onOpenChange={setDetailsOpen} product={detailsProduct} />
       </div>
     </TooltipProvider>
   );

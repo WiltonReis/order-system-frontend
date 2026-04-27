@@ -23,6 +23,7 @@ import { listProducts } from "@/services/productService";
 import { createOrder, updateOrder } from "@/services/orderService";
 import type { Order, Product } from "@/lib/types";
 import { useAuth } from "@/context/AuthContext";
+import { extractErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
 
 interface Props {
@@ -47,6 +48,7 @@ export function OrderFormDialog({ open, onOpenChange, createdByName, onSaved, or
   const [products, setProducts] = useState<Product[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [customerName, setCustomerName] = useState<string>("");
   const [discountType, setDiscountType] = useState<"PERCENT" | "VALUE">("PERCENT");
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
@@ -57,10 +59,12 @@ export function OrderFormDialog({ open, onOpenChange, createdByName, onSaved, or
     setSelectedProduct("");
     if (order) {
       setLines(order.items.map((it) => ({ productId: it.productId, quantity: it.quantity })));
+      setCustomerName(order.customerName ?? "");
       setDiscountType(order.discountType);
       setDiscountAmount(order.discountAmount);
     } else {
       setLines([]);
+      setCustomerName("");
       setDiscountType("PERCENT");
       setDiscountAmount(0);
     }
@@ -69,7 +73,7 @@ export function OrderFormDialog({ open, onOpenChange, createdByName, onSaved, or
   const enrichedLines = useMemo(
     () =>
       lines.map((l) => {
-        const p = products.find((p) => p.id === l.productId)!;
+        const p = products.find((p) => p.id === l.productId) as Product | undefined;
         return { ...l, product: p, subtotal: (p?.price ?? 0) * l.quantity };
       }),
     [lines, products],
@@ -110,7 +114,9 @@ export function OrderFormDialog({ open, onOpenChange, createdByName, onSaved, or
       const payload = {
         items: lines,
         discountType,
-        discountAmount: isAdmin ? Number(discountAmount) || 0 : 0,
+        // undefined sinaliza para o service que não deve tocar no desconto (usuário sem ADMIN)
+        discountAmount: isAdmin ? Number(discountAmount) || 0 : undefined,
+        customerName: customerName.trim() || undefined,
       };
       if (isEdit && order) {
         await updateOrder({ id: order.id, ...payload }, products);
@@ -122,7 +128,7 @@ export function OrderFormDialog({ open, onOpenChange, createdByName, onSaved, or
       onSaved();
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Erro ao salvar pedido");
+      toast.error(extractErrorMessage(e, "Erro ao salvar pedido"));
     } finally {
       setSubmitting(false);
     }
@@ -134,13 +140,22 @@ export function OrderFormDialog({ open, onOpenChange, createdByName, onSaved, or
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{isEdit ? `Editar pedido ${order?.id}` : "Novo pedido"}</DialogTitle>
+          <DialogTitle>{isEdit ? `Editar pedido #${order?.orderCode}` : "Novo pedido"}</DialogTitle>
           <DialogDescription>
             Selecione produtos, ajuste quantidades{isAdmin ? " e aplique desconto se necessário." : "."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5">
+          <div className="space-y-1.5">
+            <Label>Cliente (opcional)</Label>
+            <Input
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              placeholder="Nome do cliente"
+            />
+          </div>
+
           <div className="flex flex-col gap-2 sm:flex-row">
             <Select value={selectedProduct} onValueChange={setSelectedProduct}>
               <SelectTrigger className="flex-1">

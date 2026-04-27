@@ -1,37 +1,47 @@
+import { api } from "@/lib/api";
 import type { Role, User } from "@/lib/types";
 
-let mockUsers: User[] = [
-  { id: "1", name: "Administrador", username: "admin", role: "ADMIN" },
-  { id: "2", name: "Operador", username: "user", role: "USER" },
-  { id: "3", name: "Maria Silva", username: "maria", role: "USER" },
-  { id: "4", name: "Carlos Souza", username: "carlos", role: "ADMIN" },
-];
+interface BackendUserResponse {
+  id: string;
+  username: string;
+  role: Role;
+}
 
-/** Replace with: const { data } = await api.get<User[]>("/users"); return data; */
+function mapUser(u: BackendUserResponse): User {
+  return { id: u.id, name: u.username, username: u.username, role: u.role };
+}
+
 export async function listUsers(): Promise<User[]> {
-  await new Promise((r) => setTimeout(r, 200));
-  return [...mockUsers];
+  const { data } = await api.get<BackendUserResponse[]>("/users");
+  return data.map(mapUser);
 }
 
-/** Replace with: const { data } = await api.post<User>("/users", input); return data; */
-export async function createUser(input: { name: string; username: string; role: Role }): Promise<User> {
-  await new Promise((r) => setTimeout(r, 200));
-  const user: User = { id: String(Date.now()), ...input };
-  mockUsers = [user, ...mockUsers];
-  return user;
+export async function createUser(input: { name: string; username: string; password: string; role: Role }): Promise<User> {
+  const { data } = await api.post<BackendUserResponse>("/users", {
+    username: input.username,
+    password: input.password,
+    role: input.role,
+  });
+  return mapUser(data);
 }
 
-/** Replace with: await api.delete(`/users/${id}`); */
+export async function updateUser(
+  id: string,
+  input: { username: string; password?: string; role: Role },
+): Promise<User> {
+  const { data } = await api.put<BackendUserResponse>(`/users/${id}`, {
+    username: input.username,
+    password: input.password ?? "",
+    role: input.role,
+  });
+  return mapUser(data);
+}
+
 export async function deleteUser(id: string): Promise<void> {
-  await new Promise((r) => setTimeout(r, 200));
-  mockUsers = mockUsers.filter((u) => u.id !== id);
+  await api.delete(`/users/${id}`);
 }
 
-/** Replace with: const { data } = await api.patch<User>(`/users/${id}`, { role }); return data; */
 export async function updateUserRole(id: string, role: Role): Promise<User> {
-  await new Promise((r) => setTimeout(r, 200));
-  const idx = mockUsers.findIndex((u) => u.id === id);
-  if (idx === -1) throw new Error("Usuário não encontrado");
-  mockUsers[idx] = { ...mockUsers[idx], role };
-  return mockUsers[idx];
+  const { data } = await api.patch<BackendUserResponse>(`/users/${id}/role`, { role });
+  return mapUser(data);
 }

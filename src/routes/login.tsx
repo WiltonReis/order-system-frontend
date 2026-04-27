@@ -72,7 +72,7 @@ function LoginPage() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin ou user"
+              placeholder="Usuário"
               required
             />
           </div>
@@ -100,11 +100,6 @@ function LoginPage() {
             {loading ? "Entrando..." : "Entrar"}
           </Button>
 
-          <p className="text-center text-xs text-muted-foreground">
-            Demo: <span className="font-mono text-foreground">admin</span> ou{" "}
-            <span className="font-mono text-foreground">user</span> / senha{" "}
-            <span className="font-mono text-foreground">123456</span>
-          </p>
         </form>
       </div>
     </main>

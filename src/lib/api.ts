@@ -24,3 +24,17 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+/**
+ * Extrai a mensagem de erro do backend a partir de erros Axios ou genéricos.
+ * O backend retorna { message, status } no corpo dos erros.
+ */
+export function extractErrorMessage(e: unknown, fallback = "Erro inesperado"): string {
+  if (axios.isAxiosError(e)) {
+    const msg = (e.response?.data as { message?: string } | undefined)?.message;
+    if (msg) return msg;
+    return e.message;
+  }
+  if (e instanceof Error) return e.message;
+  return fallback;
+}

@@ -14,7 +14,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["ADMIN", "USER"] },
   { to: "/orders", label: "Pedidos", icon: ShoppingCart, roles: ["ADMIN", "USER"] },
-  { to: "/products", label: "Produtos", icon: Package, roles: ["ADMIN"] },
+  { to: "/products", label: "Produtos", icon: Package, roles: ["ADMIN", "USER"] },
   { to: "/users", label: "Usuários", icon: Users, roles: ["ADMIN"] },
 ];
 
