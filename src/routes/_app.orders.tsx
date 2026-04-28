@@ -169,7 +169,14 @@ function OrdersPage() {
 
         <Tabs defaultValue="active">
           <TabsList>
-            <TabsTrigger value="active">Ativos</TabsTrigger>
+            <TabsTrigger value="active" className="relative">
+              Ativos
+              {activeOrders.length > 0 && (
+                <span className="badge-pulse-animate absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-white">
+                  {activeOrders.length}
+                </span>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="history">Histórico</TabsTrigger>
           </TabsList>
 
@@ -186,6 +193,7 @@ function OrdersPage() {
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead>Pedido</TableHead>
+                        <TableHead>Cliente</TableHead>
                         <TableHead>Criado em</TableHead>
                         <TableHead>Usuário</TableHead>
                         <TableHead className="text-center">Itens</TableHead>
@@ -196,8 +204,11 @@ function OrdersPage() {
                     <TableBody>
                       {activeOrders.map((o) => (
                         <TableRow key={o.id}>
-                          <TableCell className="font-mono text-sm font-semibold">
-                            #{o.orderCode}
+                          <TableCell>
+                            <span className="font-mono text-xs font-semibold tracking-widest">#{o.orderCode}</span>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {o.customerName || <span className="text-muted-foreground">—</span>}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {dateTime(o.createdAt)}
@@ -288,6 +299,7 @@ function OrdersPage() {
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead>Pedido</TableHead>
+                        <TableHead>Cliente</TableHead>
                         <TableHead>Criado em</TableHead>
                         <TableHead>Usuário</TableHead>
                         <TableHead>Status</TableHead>
@@ -299,7 +311,12 @@ function OrdersPage() {
                     <TableBody>
                       {historyOrders.map((o) => (
                         <TableRow key={o.id} className="opacity-80">
-                          <TableCell className="font-mono text-sm font-semibold">#{o.orderCode}</TableCell>
+                          <TableCell>
+                            <span className="font-mono text-xs font-semibold tracking-widest">#{o.orderCode}</span>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            {o.customerName || <span className="text-muted-foreground">—</span>}
+                          </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
                             {dateTime(o.createdAt)}
                           </TableCell>

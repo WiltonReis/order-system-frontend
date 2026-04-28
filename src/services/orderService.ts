@@ -17,7 +17,7 @@ interface BackendOrderItem {
   price: number;
 }
 
-interface BackendOrderDetail {
+interface BackendOrderSummary {
   id: string;
   orderCode: string;
   status: string;
@@ -25,12 +25,15 @@ interface BackendOrderDetail {
   total: number;
   discount: number;
   user: { id: string; username: string };
-  items: BackendOrderItem[];
   completedAt?: string | null;
   canceledAt?: string | null;
   customerName?: string | null;
   completedByUsername?: string | null;
   canceledByUsername?: string | null;
+}
+
+interface BackendOrderDetail extends BackendOrderSummary {
+  items: BackendOrderItem[];
 }
 
 function mapItem(item: BackendOrderItem): OrderItem {

@@ -29,8 +29,16 @@ export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span className="font-mono">#{order.orderCode || order.id}</span>
+          <DialogTitle className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-lg">#{order.orderCode || order.id}</span>
+              {order.customerName && (
+                <>
+                  <span className="text-muted-foreground">•</span>
+                  <span className="text-lg font-semibold text-white">{order.customerName}</span>
+                </>
+              )}
+            </div>
             <OrderStatusBadge status={order.status} />
           </DialogTitle>
           <DialogDescription>Detalhes completos do pedido</DialogDescription>
@@ -46,12 +54,6 @@ export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
               <div className="text-xs text-muted-foreground">Criado por</div>
               <div className="font-medium">{order.createdByName}</div>
             </div>
-            {order.customerName && (
-              <div>
-                <div className="text-xs text-muted-foreground">Cliente</div>
-                <div className="font-medium">{order.customerName}</div>
-              </div>
-            )}
             {order.completedAt && (
               <div>
                 <div className="text-xs text-muted-foreground">Finalizado em</div>

@@ -9,11 +9,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { brl } from "@/lib/format";
 import type { Product } from "@/lib/types";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: Product | null;
+  isAdmin?: boolean;
+  onEdit?: (product: Product) => void;
+  onDelete?: (product: Product) => void;
 }
 
 function CatPlaceholder() {
@@ -57,7 +61,7 @@ function CatPlaceholder() {
   );
 }
 
-export function ProductDetailsDialog({ open, onOpenChange, product }: Props) {
+export function ProductDetailsDialog({ open, onOpenChange, product, isAdmin, onEdit, onDelete }: Props) {
   if (!product) return null;
 
   return (
@@ -84,7 +88,7 @@ export function ProductDetailsDialog({ open, onOpenChange, product }: Props) {
           </div>
 
           {product.description && (
-            <p className="text-sm text-muted-foreground">{product.description}</p>
+            <p className="text-base leading-relaxed text-foreground">{product.description}</p>
           )}
 
           <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
@@ -95,7 +99,40 @@ export function ProductDetailsDialog({ open, onOpenChange, product }: Props) {
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex justify-between">
+          <div className="flex gap-2">
+            {isAdmin && (
+              <>
+                {onEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      onEdit(product);
+                      onOpenChange(false);
+                    }}
+                  >
+                    <Pencil className="mr-1 h-4 w-4" />
+                    Editar
+                  </Button>
+                )}
+                {onDelete && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => {
+                      onDelete(product);
+                      onOpenChange(false);
+                    }}
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" />
+                    Excluir
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Fechar
           </Button>

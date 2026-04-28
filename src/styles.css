@@ -83,6 +83,26 @@
                  0 8px 24px -12px rgb(0 0 0 / 0.6);
 }
 
+@keyframes chartBarGrow {
+  from {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
@@ -98,4 +118,32 @@
   button, [role="button"], [role="tab"], [role="option"], [role="menuitem"], a, summary {
     cursor: pointer;
   }
+}
+
+.chart-bar-animate {
+  animation: chartBarGrow 800ms ease-out forwards;
+}
+
+.badge-pulse-animate {
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+/* Aplicar animação às barras do recharts */
+[data-chart] {
+  position: relative;
+}
+
+[data-chart] .recharts-wrapper {
+  position: relative;
+}
+
+[data-chart] .recharts-bar-rectangle {
+  animation: chartBarGrow 800ms ease-out forwards !important;
+  transform-origin: left center !important;
+}
+
+[data-chart] .recharts-xaxis .recharts-cartesian-axis-line,
+[data-chart] .recharts-yaxis .recharts-cartesian-axis-line {
+  position: relative;
+  z-index: 10;
 }

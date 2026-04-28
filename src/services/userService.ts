@@ -36,8 +36,8 @@ export async function updateUser(
 ): Promise<User> {
   const { data } = await api.put<BackendUserResponse>(`/users/${id}`, {
     username: input.username,
-    password: input.password ?? "",
     role: input.role,
+    ...(input.password && { password: input.password }),
   });
   return mapUser(data);
 }

@@ -22,6 +22,16 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -64,6 +74,8 @@ function UsersPage() {
   const [editPassword, setEditPassword] = useState("");
   const [editRole, setEditRole] = useState<Role>("USER");
 
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
@@ -96,11 +108,16 @@ function UsersPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Excluir este usuário?")) return;
+  const handleDeleteClick = (u: User) => {
+    setDeleteTarget(u);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteUser(id);
+      await deleteUser(deleteTarget.id);
       toast.success("Usuário excluído");
+      setDeleteTarget(null);
       refresh();
     } catch (e) {
       toast.error(extractErrorMessage(e, "Erro ao excluir usuário"));
@@ -238,7 +255,7 @@ function UsersPage() {
                                 size="icon"
                                 variant="ghost"
                                 className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                onClick={() => handleDelete(u.id)}
+                                onClick={() => handleDeleteClick(u)}
                                 disabled={u.id === user?.id}
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -357,6 +374,24 @@ function UsersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Confirmation dialog for delete */}
+        <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+              <AlertDialogDescription>
+                O usuário "{deleteTarget?.username}" será permanentemente removido do sistema. Essa ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={executeDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </TooltipProvider>
   );

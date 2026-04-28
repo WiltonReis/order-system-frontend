@@ -65,3 +65,16 @@ export interface CreateOrderPayload {
 export interface UpdateOrderPayload extends CreateOrderPayload {
   id: string;
 }
+
+export interface TopProduct {
+  productName: string;
+  totalQuantity: number;
+}
+
+export interface DashboardData {
+  totalOrders: number;
+  revenue: number;
+  cancelRate: number;
+  averageTicket: number;
+  topProducts: TopProduct[];
+}

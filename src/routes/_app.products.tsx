@@ -21,6 +21,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/context/AuthContext";
 import { brl } from "@/lib/format";
@@ -66,6 +76,9 @@ function ProductsPage() {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editPrice, setEditPrice] = useState("");
+
+  // Estado do dialog de confirmação de exclusão
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,11 +133,16 @@ function ProductsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este produto?")) return;
+  const handleDeleteClick = (p: Product) => {
+    setDeleteTarget(p);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteProduct(id);
+      await deleteProduct(deleteTarget.id);
       toast.success("Produto excluído");
+      setDeleteTarget(null);
       refresh();
     } catch (e) {
       toast.error(extractErrorMessage(e, "Erro ao excluir produto"));
@@ -178,72 +196,34 @@ function ProductsPage() {
             </div>
           ) : (
             <>
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>Produto</TableHead>
-                    <TableHead className="text-right">Preço</TableHead>
-                    <TableHead className="w-[140px] text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {products.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">{p.name}</TableCell>
-                      <TableCell className="text-right">
-                        <span className="tabular-nums font-semibold text-primary">{brl(p.price)}</span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8"
-                                onClick={() => openDetails(p)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Ver detalhes</TooltipContent>
-                          </Tooltip>
-                          {isAdmin && (
-                            <>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8 hover:text-primary"
-                                    onClick={() => openEdit(p)}
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Editar produto</TooltipContent>
-                              </Tooltip>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                    onClick={() => handleDelete(p.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Excluir produto</TooltipContent>
-                              </Tooltip>
-                            </>
-                          )}
+              <div className="grid grid-cols-5 gap-4 p-6">
+                {products.map((p) => (
+                  <div key={p.id} className="flex flex-col gap-3 rounded-lg border border-border bg-muted/50 p-4 hover:bg-muted/70 transition-colors">
+                    <div className="aspect-square overflow-hidden rounded bg-muted">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <Package className="h-12 w-12 text-muted-foreground" />
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      )}
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <h3 className="text-sm font-semibold line-clamp-2">{p.name}</h3>
+                      <p className="text-base font-bold text-primary">{brl(p.price)}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => openDetails(p)}
+                    >
+                      <Eye className="mr-1 h-3 w-3" />
+                      Visualizar
+                    </Button>
+                  </div>
+                ))}
+              </div>
               {totalPages > 1 && (
                 <div className="flex items-center justify-center gap-3 border-t p-3">
                   <Button
@@ -365,7 +345,32 @@ function ProductsPage() {
           </Dialog>
         )}
 
-        <ProductDetailsDialog open={detailsOpen} onOpenChange={setDetailsOpen} product={detailsProduct} />
+        <ProductDetailsDialog
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          product={detailsProduct}
+          isAdmin={isAdmin}
+          onEdit={openEdit}
+          onDelete={handleDeleteClick}
+        />
+
+        {/* Confirmation dialog for delete */}
+        <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir produto?</AlertDialogTitle>
+              <AlertDialogDescription>
+                O produto "{deleteTarget?.name}" será permanentemente removido do catálogo. Essa ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={executeDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </TooltipProvider>
   );
