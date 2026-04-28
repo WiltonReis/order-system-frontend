@@ -69,3 +69,12 @@ export async function updateProductPrice(id: string, price: number): Promise<Pro
 export async function deleteProduct(id: string): Promise<void> {
   await api.delete(`/products/${id}`);
 }
+
+export async function uploadProductImage(id: string, file: File): Promise<Product> {
+  const formData = new FormData();
+  formData.append("image", file);
+  const { data } = await api.post<BackendProduct>(`/products/${id}/image`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return mapProduct(data);
+}

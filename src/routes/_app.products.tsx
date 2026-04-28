@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Eye, Package, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,12 +35,13 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/context/AuthContext";
 import { brl } from "@/lib/format";
-import { extractErrorMessage } from "@/lib/api";
+import { extractErrorMessage, resolveImageUrl } from "@/lib/api";
 import {
   createProduct,
   deleteProduct,
   listProductsPaged,
   updateProduct,
+  uploadProductImage,
 } from "@/services/productService";
 import { ProductDetailsDialog } from "@/components/orders/ProductDetailsDialog";
 import type { Product } from "@/lib/types";
@@ -53,18 +55,27 @@ export const Route = createFileRoute("/_app/products")({
 function ProductsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
+  const queryClient = useQueryClient();
 
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const [loadKey, setLoadKey] = useState(0);
+
+  const { data, isPending } = useQuery({
+    queryKey: ["products", page],
+    queryFn: () => listProductsPaged(page),
+  });
+
+  const products = data?.content ?? [];
+  const totalPages = data?.totalPages ?? 0;
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["products"] });
 
   // Estado do dialog de criação
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newPrice, setNewPrice] = useState("");
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+  const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
 
   // Estado do dialog de visualização
   const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
@@ -76,29 +87,23 @@ function ProductsPage() {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editPrice, setEditPrice] = useState("");
+  const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
 
   // Estado do dialog de confirmação de exclusão
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setLoading(true);
-      try {
-        const result = await listProductsPaged(page);
-        if (!cancelled) {
-          setProducts(result.content);
-          setTotalPages(result.totalPages);
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [page, loadKey]);
-
-  const refresh = () => setLoadKey((k) => k + 1);
+  function handleImageSelect(
+    file: File | undefined,
+    prevPreview: string | null,
+    setFile: (f: File | null) => void,
+    setPreview: (s: string | null) => void,
+  ) {
+    if (!file) return;
+    if (prevPreview) URL.revokeObjectURL(prevPreview);
+    setFile(file);
+    setPreview(URL.createObjectURL(file));
+  }
 
   const openDetails = (p: Product) => {
     setDetailsProduct(p);
@@ -114,20 +119,31 @@ function ProductsPage() {
   };
 
   const handleSaveEdit = async () => {
+    if (!editTarget) return;
     const price = parseFloat(editPrice);
     if (!editName.trim() || isNaN(price) || price < 0) {
       toast.error("Preencha nome e preço válidos");
       return;
     }
     try {
-      await updateProduct(editTarget!.id, {
+      await updateProduct(editTarget.id, {
         name: editName.trim(),
         description: editDescription.trim(),
         price,
       });
+      if (editImageFile) {
+        try {
+          await uploadProductImage(editTarget.id, editImageFile);
+        } catch (e) {
+          toast.error(extractErrorMessage(e, "Erro ao enviar imagem"));
+        }
+      }
       toast.success("Produto atualizado");
+      if (editImagePreview) URL.revokeObjectURL(editImagePreview);
+      setEditImageFile(null);
+      setEditImagePreview(null);
       setEditOpen(false);
-      refresh();
+      invalidate();
     } catch (e) {
       toast.error(extractErrorMessage(e, "Erro ao atualizar produto"));
     }
@@ -143,7 +159,7 @@ function ProductsPage() {
       await deleteProduct(deleteTarget.id);
       toast.success("Produto excluído");
       setDeleteTarget(null);
-      refresh();
+      invalidate();
     } catch (e) {
       toast.error(extractErrorMessage(e, "Erro ao excluir produto"));
     }
@@ -156,13 +172,23 @@ function ProductsPage() {
       return;
     }
     try {
-      await createProduct({ name: newName.trim(), description: newDescription.trim(), price });
+      const product = await createProduct({ name: newName.trim(), description: newDescription.trim(), price });
+      if (newImageFile) {
+        try {
+          await uploadProductImage(product.id, newImageFile);
+        } catch (e) {
+          toast.error(extractErrorMessage(e, "Erro ao enviar imagem"));
+        }
+      }
       toast.success("Produto criado");
       setNewName("");
       setNewDescription("");
       setNewPrice("");
+      if (newImagePreview) URL.revokeObjectURL(newImagePreview);
+      setNewImageFile(null);
+      setNewImagePreview(null);
       setCreateOpen(false);
-      refresh();
+      invalidate();
     } catch (e) {
       toast.error(extractErrorMessage(e, "Erro ao criar produto"));
     }
@@ -187,7 +213,7 @@ function ProductsPage() {
         </div>
 
         <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-          {loading ? (
+          {isPending ? (
             <div className="p-10 text-center text-sm text-muted-foreground">Carregando...</div>
           ) : products.length === 0 ? (
             <div className="flex flex-col items-center gap-2 p-12 text-center">
@@ -200,8 +226,8 @@ function ProductsPage() {
                 {products.map((p) => (
                   <div key={p.id} className="flex flex-col gap-3 rounded-lg border border-border bg-muted/50 p-4 hover:bg-muted/70 transition-colors">
                     <div className="aspect-square overflow-hidden rounded bg-muted">
-                      {p.imageUrl ? (
-                        <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
+                      {resolveImageUrl(p.imageUrl) ? (
+                        <img src={resolveImageUrl(p.imageUrl)!} alt={p.name} className="h-full w-full object-cover" />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center">
                           <Package className="h-12 w-12 text-muted-foreground" />
@@ -255,7 +281,14 @@ function ProductsPage() {
 
         {/* Dialog de criação */}
         {isAdmin && (
-          <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <Dialog open={createOpen} onOpenChange={(open) => {
+            if (!open) {
+              if (newImagePreview) URL.revokeObjectURL(newImagePreview);
+              setNewImageFile(null);
+              setNewImagePreview(null);
+            }
+            setCreateOpen(open);
+          }}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Novo produto</DialogTitle>
@@ -290,6 +323,21 @@ function ProductsPage() {
                     placeholder="0,00"
                   />
                 </div>
+                <div className="space-y-1.5">
+                  <Label>Imagem (opcional)</Label>
+                  {newImagePreview && (
+                    <div className="aspect-square w-24 overflow-hidden rounded border border-border bg-muted">
+                      <img src={newImagePreview} alt="" className="h-full w-full object-cover" />
+                    </div>
+                  )}
+                  <Input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) =>
+                      handleImageSelect(e.target.files?.[0], newImagePreview, setNewImageFile, setNewImagePreview)
+                    }
+                  />
+                </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
@@ -301,7 +349,14 @@ function ProductsPage() {
 
         {/* Dialog de edição completa (nome, descrição, preço) */}
         {isAdmin && (
-          <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <Dialog open={editOpen} onOpenChange={(open) => {
+            if (!open) {
+              if (editImagePreview) URL.revokeObjectURL(editImagePreview);
+              setEditImageFile(null);
+              setEditImagePreview(null);
+            }
+            setEditOpen(open);
+          }}>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Editar produto</DialogTitle>
@@ -334,6 +389,25 @@ function ProductsPage() {
                     value={editPrice}
                     onChange={(e) => setEditPrice(e.target.value)}
                     placeholder="0,00"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Imagem (opcional)</Label>
+                  {(editImagePreview ?? resolveImageUrl(editTarget?.imageUrl)) && (
+                    <div className="aspect-square w-24 overflow-hidden rounded border border-border bg-muted">
+                      <img
+                        src={editImagePreview ?? resolveImageUrl(editTarget?.imageUrl)!}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <Input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(e) =>
+                      handleImageSelect(e.target.files?.[0], editImagePreview, setEditImageFile, setEditImagePreview)
+                    }
                   />
                 </div>
               </div>

@@ -3,7 +3,7 @@ import axios from "axios";
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "/api",
   headers: { "Content-Type": "application/json" },
-  // Envia o cookie httpOnly automaticamente em todas as requisições
+  // Envia cookies httpOnly automaticamente em todas as requisições
   withCredentials: true,
 });
 
@@ -21,17 +21,71 @@ export const userStorage = {
   clear: () => localStorage.removeItem(USER_KEY),
 };
 
-// Redireciona para login quando o token expira (401) ou sessão é inválida
+let isRefreshing = false;
+let pendingQueue: Array<{ resolve: () => void; reject: (e: unknown) => void }> = [];
+
+function drainQueue(error: unknown) {
+  pendingQueue.forEach((p) => (error ? p.reject(error) : p.resolve()));
+  pendingQueue = [];
+}
+
+function redirectToLogin() {
+  userStorage.clear();
+  if (window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+}
+
+// Interceptor de resposta: ao receber 401, tenta renovar o access token via
+// refresh token (cookie httpOnly) antes de forçar re-login.
 api.interceptors.response.use(
   (res) => res,
-  (err) => {
-    if (axios.isAxiosError(err) && err.response?.status === 401) {
-      userStorage.clear();
-      window.location.href = "/login";
+  async (err) => {
+    const originalRequest = err.config as typeof err.config & { _retry?: boolean };
+
+    if (!axios.isAxiosError(err) || err.response?.status !== 401) {
+      return Promise.reject(err);
     }
-    return Promise.reject(err);
+
+    // Não tentar renovar em endpoints de auth ou em retry já executado
+    const isAuthEndpoint = (originalRequest.url as string)?.includes("/auth/");
+    if (isAuthEndpoint || originalRequest._retry) {
+      redirectToLogin();
+      return Promise.reject(err);
+    }
+
+    if (isRefreshing) {
+      return new Promise<void>((resolve, reject) => {
+        pendingQueue.push({ resolve, reject });
+      }).then(() => api(originalRequest));
+    }
+
+    originalRequest._retry = true;
+    isRefreshing = true;
+
+    try {
+      await api.post("/auth/refresh");
+      drainQueue(null);
+      return api(originalRequest);
+    } catch (refreshError) {
+      drainQueue(refreshError);
+      redirectToLogin();
+      return Promise.reject(refreshError);
+    } finally {
+      isRefreshing = false;
+    }
   },
 );
+
+// Converte imageUrl relativa do backend ("/uploads/...") em URL absoluta usando VITE_API_URL.
+export function resolveImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (url.startsWith("/")) {
+    const base = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
+    return base + url;
+  }
+  return url;
+}
 
 /**
  * Extrai a mensagem de erro do backend a partir de erros Axios ou genéricos.

@@ -29,7 +29,6 @@ import { toast } from "sonner";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  createdByName: string;
   onSaved: () => void;
   /** When provided, dialog is in edit mode for this order */
   order?: Order | null;
@@ -40,7 +39,7 @@ interface Line {
   quantity: number;
 }
 
-export function OrderFormDialog({ open, onOpenChange, createdByName, onSaved, order }: Props) {
+export function OrderFormDialog({ open, onOpenChange, onSaved, order }: Props) {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
   const isEdit = !!order;
@@ -122,7 +121,7 @@ export function OrderFormDialog({ open, onOpenChange, createdByName, onSaved, or
         await updateOrder({ id: order.id, ...payload }, products);
         toast.success("Pedido atualizado");
       } else {
-        await createOrder(payload, products, createdByName);
+        await createOrder(payload, products);
         toast.success("Pedido criado");
       }
       onSaved();
@@ -151,6 +150,7 @@ export function OrderFormDialog({ open, onOpenChange, createdByName, onSaved, or
             <Label>Cliente (opcional)</Label>
             <Input
               value={customerName}
+              maxLength={150}
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder="Nome do cliente"
             />

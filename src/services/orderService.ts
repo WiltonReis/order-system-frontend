@@ -98,7 +98,6 @@ export async function getOrder(id: string): Promise<Order | undefined> {
 export async function createOrder(
   payload: CreateOrderPayload,
   products: Product[],
-  _createdByName: string,
 ): Promise<Order> {
   const { data: created } = await api.post<{ id: string }>("/orders", {
     customerName: payload.customerName || undefined,

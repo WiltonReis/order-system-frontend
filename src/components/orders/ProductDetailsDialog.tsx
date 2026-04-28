@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { brl } from "@/lib/format";
+import { resolveImageUrl } from "@/lib/api";
 import type { Product } from "@/lib/types";
 import { Pencil, Trash2 } from "lucide-react";
 
@@ -74,9 +75,9 @@ export function ProductDetailsDialog({ open, onOpenChange, product, isAdmin, onE
 
         <div className="space-y-4">
           <div className="flex h-40 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30">
-            {product.imageUrl ? (
+            {resolveImageUrl(product.imageUrl) ? (
               <img
-                src={product.imageUrl}
+                src={resolveImageUrl(product.imageUrl)!}
                 alt={product.name}
                 className="h-full w-full object-cover"
               />
