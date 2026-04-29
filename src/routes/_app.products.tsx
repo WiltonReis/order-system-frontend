@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Eye, Package, Pencil, Plus, Trash2 } from "lucide-react";
@@ -58,6 +58,10 @@ function ProductsPage() {
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(0);
+
+  // File input refs for image upload
+  const newImageInputRef = useRef<HTMLInputElement>(null);
+  const editImageInputRef = useRef<HTMLInputElement>(null);
 
   const { data, isPending } = useQuery({
     queryKey: ["products", page],
@@ -318,24 +322,37 @@ function ProductsPage() {
                   <Input
                     type="number"
                     step="0.01"
+                    min="0"
                     value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setNewPrice(String(Math.max(0, val)));
+                    }}
                     placeholder="0,00"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Imagem (opcional)</Label>
-                  {newImagePreview && (
-                    <div className="aspect-square w-24 overflow-hidden rounded border border-border bg-muted">
-                      <img src={newImagePreview} alt="" className="h-full w-full object-cover" />
+                  <div className="flex justify-center">
+                    <div
+                      onClick={() => newImageInputRef.current?.click()}
+                      className="h-32 w-32 cursor-pointer overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/50 hover:bg-muted transition-colors flex items-center justify-center"
+                    >
+                      {newImagePreview ? (
+                        <img src={newImagePreview} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <Pencil className="h-6 w-6 text-muted-foreground" />
+                      )}
                     </div>
-                  )}
-                  <Input
+                  </div>
+                  <input
+                    ref={newImageInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     onChange={(e) =>
                       handleImageSelect(e.target.files?.[0], newImagePreview, setNewImageFile, setNewImagePreview)
                     }
+                    className="hidden"
                   />
                 </div>
               </div>
@@ -386,28 +403,41 @@ function ProductsPage() {
                   <Input
                     type="number"
                     step="0.01"
+                    min="0"
                     value={editPrice}
-                    onChange={(e) => setEditPrice(e.target.value)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value) || 0;
+                      setEditPrice(String(Math.max(0, val)));
+                    }}
                     placeholder="0,00"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Imagem (opcional)</Label>
-                  {(editImagePreview ?? resolveImageUrl(editTarget?.imageUrl)) && (
-                    <div className="aspect-square w-24 overflow-hidden rounded border border-border bg-muted">
-                      <img
-                        src={editImagePreview ?? resolveImageUrl(editTarget?.imageUrl)!}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
+                  <div className="flex justify-center">
+                    <div
+                      onClick={() => editImageInputRef.current?.click()}
+                      className="h-32 w-32 cursor-pointer overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/50 hover:bg-muted transition-colors flex items-center justify-center"
+                    >
+                      {editImagePreview ?? resolveImageUrl(editTarget?.imageUrl) ? (
+                        <img
+                          src={editImagePreview ?? resolveImageUrl(editTarget?.imageUrl)!}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <Pencil className="h-6 w-6 text-muted-foreground" />
+                      )}
                     </div>
-                  )}
-                  <Input
+                  </div>
+                  <input
+                    ref={editImageInputRef}
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
                     onChange={(e) =>
                       handleImageSelect(e.target.files?.[0], editImagePreview, setEditImageFile, setEditImagePreview)
                     }
+                    className="hidden"
                   />
                 </div>
               </div>

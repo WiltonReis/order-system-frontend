@@ -139,11 +139,11 @@ function DashboardPage() {
                   Nenhum produto vendido no período.
                 </p>
               ) : (
-                <ChartContainer config={chartConfig} className="h-[220px] w-full">
+                <ChartContainer config={chartConfig} className="h-[220px] w-full overflow-hidden">
                   <BarChart
                     layout="vertical"
                     data={data.topProducts}
-                    margin={{ top: 0, right: 24, bottom: 0, left: 0 }}
+                    margin={{ top: 0, right: 24, bottom: 0, left: 8 }}
                   >
                     <CartesianGrid horizontal={false} />
                     <XAxis type="number" allowDecimals={false} />
@@ -158,6 +158,9 @@ function DashboardPage() {
                       dataKey="totalQuantity"
                       fill="var(--color-totalQuantity)"
                       radius={[0, 4, 4, 0]}
+                      animationBegin={0}
+                      animationDuration={500}
+                      animationEasing="ease-out"
                     />
                   </BarChart>
                 </ChartContainer>

@@ -25,13 +25,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cancelOrder, finalizeOrder, listOrders } from "@/services/orderService";
+import type { OrderFilters } from "@/services/orderService";
 import { extractErrorMessage } from "@/lib/api";
-import type { Order } from "@/lib/types";
+import type { Order, OrderStatus } from "@/lib/types";
 import { brl, dateTime } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
 import { OrderFormDialog } from "@/components/orders/OrderFormDialog";
 import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
 import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
+import { OrderFilterBar } from "@/components/orders/OrderFilterBar";
 
 export const Route = createFileRoute("/_app/orders")({
   head: () => ({
@@ -44,40 +46,75 @@ type ConfirmAction = { type: "finalize" | "cancel"; order: Order };
 
 function OrdersPage() {
   const { user } = useAuth();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
+
+  // Per-tab independent state
+  const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
+  const [activePage, setActivePage] = useState(0);
+  const [historyPage, setHistoryPage] = useState(0);
+  const [activeTotalPages, setActiveTotalPages] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(0);
+  const [activeLoading, setActiveLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
   const [loadKey, setLoadKey] = useState(0);
+  const [filters, setFilters] = useState<OrderFilters>({});
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
-  const activeOrders = orders.filter((o) => o.status === "OPEN");
-  const historyOrders = orders.filter(
-    (o) => o.status === "COMPLETED" || o.status === "CANCELED",
-  );
-
+  // Active tab always fetches OPEN orders; respects user status filter when it includes OPEN
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
-      setLoading(true);
+      setActiveLoading(true);
+      const tabStatuses: OrderStatus[] = filters.statuses?.length
+        ? filters.statuses.filter((s) => s === "OPEN")
+        : ["OPEN"];
       try {
-        const result = await listOrders(page);
+        const result = await listOrders(activePage, 20, { ...filters, statuses: tabStatuses });
         if (!cancelled) {
-          setOrders(result.content);
-          setTotalPages(result.totalPages);
+          setActiveOrders(result.content);
+          setActiveTotalPages(result.totalPages);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setActiveLoading(false);
       }
     };
     load();
     return () => { cancelled = true; };
-  }, [page, loadKey]);
+  }, [activePage, loadKey, filters]);
+
+  // History tab always fetches COMPLETED/CANCELED orders
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setHistoryLoading(true);
+      const tabStatuses: OrderStatus[] = filters.statuses?.length
+        ? filters.statuses.filter((s) => s === "COMPLETED" || s === "CANCELED")
+        : ["COMPLETED", "CANCELED"];
+      try {
+        const result = await listOrders(historyPage, 20, { ...filters, statuses: tabStatuses });
+        if (!cancelled) {
+          setHistoryOrders(result.content);
+          setHistoryTotalPages(result.totalPages);
+        }
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [historyPage, loadKey, filters]);
 
   const refresh = () => setLoadKey((k) => k + 1);
+
+  const handleApplyFilters = (newFilters: OrderFilters) => {
+    setFilters(newFilters);
+    setActivePage(0);
+    setHistoryPage(0);
+  };
 
   const openCreate = () => {
     setActiveOrder(null);
@@ -101,20 +138,14 @@ function OrdersPage() {
     try {
       if (type === "finalize") {
         await finalizeOrder(order.id);
-        setOrders((prev) =>
-          prev.map((o) => (o.id === order.id ? { ...o, status: "COMPLETED" as const } : o)),
-        );
         toast.success("Pedido finalizado");
       } else {
         await cancelOrder(order.id);
-        setOrders((prev) =>
-          prev.map((o) => (o.id === order.id ? { ...o, status: "CANCELED" as const } : o)),
-        );
         toast.success("Pedido cancelado");
       }
+      refresh();
     } catch (e) {
       toast.error(extractErrorMessage(e, "Erro ao atualizar pedido"));
-      refresh();
     }
   };
 
@@ -125,26 +156,52 @@ function OrdersPage() {
     </div>
   );
 
-  const pagination = totalPages > 1 && (
+  const activePagination = activeTotalPages > 1 && (
     <div className="flex items-center justify-center gap-3 border-t p-3">
       <Button
         variant="outline"
         size="sm"
         className="h-8 w-8 p-0"
-        disabled={page === 0}
-        onClick={() => setPage((p) => p - 1)}
+        disabled={activePage === 0}
+        onClick={() => setActivePage((p) => p - 1)}
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
       <span className="text-sm text-muted-foreground">
-        {page + 1} / {totalPages}
+        {activePage + 1} / {activeTotalPages}
       </span>
       <Button
         variant="outline"
         size="sm"
         className="h-8 w-8 p-0"
-        disabled={page >= totalPages - 1}
-        onClick={() => setPage((p) => p + 1)}
+        disabled={activePage >= activeTotalPages - 1}
+        onClick={() => setActivePage((p) => p + 1)}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
+  const historyPagination = historyTotalPages > 1 && (
+    <div className="flex items-center justify-center gap-3 border-t p-3">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 p-0"
+        disabled={historyPage === 0}
+        onClick={() => setHistoryPage((p) => p - 1)}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </Button>
+      <span className="text-sm text-muted-foreground">
+        {historyPage + 1} / {historyTotalPages}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 w-8 p-0"
+        disabled={historyPage >= historyTotalPages - 1}
+        onClick={() => setHistoryPage((p) => p + 1)}
       >
         <ChevronRight className="h-4 w-4" />
       </Button>
@@ -168,22 +225,26 @@ function OrdersPage() {
         </div>
 
         <Tabs defaultValue="active">
-          <TabsList>
-            <TabsTrigger value="active" className="relative">
-              Ativos
-              {activeOrders.length > 0 && (
-                <span className="badge-pulse-animate absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-white">
-                  {activeOrders.length}
-                </span>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="history">Histórico</TabsTrigger>
-          </TabsList>
+          {/* Tabs header row: [Ativos | Histórico] ........... [Filtrar] */}
+          <div className="flex items-center justify-between">
+            <TabsList>
+              <TabsTrigger value="active" className="relative">
+                Ativos
+                {activeOrders.length > 0 && (
+                  <span className="badge-pulse-animate absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-white">
+                    {activeOrders.length}
+                  </span>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="history">Histórico</TabsTrigger>
+            </TabsList>
+            <OrderFilterBar onApply={handleApplyFilters} />
+          </div>
 
           {/* ── Active orders tab ── */}
           <TabsContent value="active">
             <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-              {loading ? (
+              {activeLoading ? (
                 <div className="p-10 text-center text-sm text-muted-foreground">Carregando...</div>
               ) : activeOrders.length === 0 ? (
                 emptyState("Nenhum pedido ativo.")
@@ -224,12 +285,7 @@ function OrdersPage() {
                             <div className="flex justify-end gap-1">
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8"
-                                    onClick={() => openDetails(o)}
-                                  >
+                                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openDetails(o)}>
                                     <Eye className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
@@ -237,12 +293,7 @@ function OrdersPage() {
                               </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8 hover:text-primary"
-                                    onClick={() => openEdit(o)}
-                                  >
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary" onClick={() => openEdit(o)}>
                                     <Pencil className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
@@ -250,12 +301,7 @@ function OrdersPage() {
                               </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8 hover:text-green-600"
-                                    onClick={() => setConfirmAction({ type: "finalize", order: o })}
-                                  >
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-green-600" onClick={() => setConfirmAction({ type: "finalize", order: o })}>
                                     <CheckCircle2 className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
@@ -263,12 +309,7 @@ function OrdersPage() {
                               </Tooltip>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    className="h-8 w-8 hover:text-destructive"
-                                    onClick={() => setConfirmAction({ type: "cancel", order: o })}
-                                  >
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" onClick={() => setConfirmAction({ type: "cancel", order: o })}>
                                     <XCircle className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
@@ -280,7 +321,7 @@ function OrdersPage() {
                       ))}
                     </TableBody>
                   </Table>
-                  {pagination}
+                  {activePagination}
                 </>
               )}
             </div>
@@ -289,7 +330,7 @@ function OrdersPage() {
           {/* ── History tab ── */}
           <TabsContent value="history">
             <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-              {loading ? (
+              {historyLoading ? (
                 <div className="p-10 text-center text-sm text-muted-foreground">Carregando...</div>
               ) : historyOrders.length === 0 ? (
                 emptyState("Nenhum pedido no histórico.")
@@ -333,12 +374,7 @@ function OrdersPage() {
                           <TableCell className="text-right">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-8 w-8"
-                                  onClick={() => openDetails(o)}
-                                >
+                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openDetails(o)}>
                                   <Eye className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
@@ -349,7 +385,7 @@ function OrdersPage() {
                       ))}
                     </TableBody>
                   </Table>
-                  {pagination}
+                  {historyPagination}
                 </>
               )}
             </div>

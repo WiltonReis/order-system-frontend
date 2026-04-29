@@ -9,6 +9,16 @@ import type {
   UpdateOrderPayload,
 } from "@/lib/types";
 
+export interface OrderFilters {
+  statuses?: OrderStatus[];
+  userId?: string;
+  sort?: string;
+  startDate?: string;
+  endDate?: string;
+  customerName?: string;
+  orderCode?: string;
+}
+
 interface BackendOrderItem {
   id: string;
   productId: string;
@@ -79,11 +89,20 @@ function computeDiscountValue(
   return discountType === "PERCENT" ? subtotal * (discountAmount / 100) : discountAmount;
 }
 
-// PERF-01 + PERF-02: busca paginada com detalhes completos (sem N+1)
-export async function listOrders(page = 0, size = 20): Promise<PageResponse<Order>> {
-  const { data } = await api.get<PageResponse<BackendOrderDetail>>(
-    `/orders/details?page=${page}&size=${size}`,
-  );
+// PERF-01 + PERF-02 + FUT-02: busca paginada com detalhes completos e filtros opcionais
+export async function listOrders(page = 0, size = 20, filters: OrderFilters = {}): Promise<PageResponse<Order>> {
+  const params = new URLSearchParams();
+  params.set("page", String(page));
+  params.set("size", String(size));
+  if (filters.sort) params.set("sort", filters.sort);
+  if (filters.userId) params.set("userId", filters.userId);
+  if (filters.customerName) params.set("customerName", filters.customerName);
+  if (filters.orderCode) params.set("orderCode", filters.orderCode);
+  if (filters.startDate) params.set("startDate", filters.startDate);
+  if (filters.endDate) params.set("endDate", filters.endDate);
+  filters.statuses?.forEach((s) => params.append("statuses", s));
+
+  const { data } = await api.get<PageResponse<BackendOrderDetail>>(`/orders/details?${params}`);
   return {
     ...data,
     content: data.content.map(mapDetail),
@@ -99,20 +118,7 @@ export async function createOrder(
   payload: CreateOrderPayload,
   products: Product[],
 ): Promise<Order> {
-  const { data: created } = await api.post<{ id: string }>("/orders", {
-    customerName: payload.customerName || undefined,
-  });
-
-  await Promise.all(
-    payload.items.map((item) =>
-      api.post(`/orders/${created.id}/items`, {
-        productId: item.productId,
-        quantity: item.quantity,
-      }),
-    ),
-  );
-
-  // Aplica desconto apenas quando ADMIN fornece um valor positivo
+  let discount: number | undefined;
   if (payload.discountAmount != null && payload.discountAmount > 0) {
     const discountValue = computeDiscountValue(
       payload.discountType,
@@ -120,13 +126,16 @@ export async function createOrder(
       payload.items,
       products,
     );
-    if (discountValue > 0) {
-      await api.put(`/orders/${created.id}`, { discount: discountValue });
-    }
+    if (discountValue > 0) discount = discountValue;
   }
 
-  const { data: detail } = await api.get<BackendOrderDetail>(`/orders/${created.id}`);
-  return mapDetail(detail);
+  const { data } = await api.post<BackendOrderDetail>("/orders/full", {
+    customerName: payload.customerName || undefined,
+    items: payload.items,
+    discount,
+  });
+
+  return mapDetail(data);
 }
 
 export async function updateOrder(

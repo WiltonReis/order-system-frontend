@@ -70,11 +70,10 @@ export function ProductDetailsDialog({ open, onOpenChange, product, isAdmin, onE
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>{product.name}</DialogTitle>
-          <DialogDescription>Detalhes do produto</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
-          <div className="flex h-40 items-center justify-center overflow-hidden rounded-lg border border-border bg-muted/30">
+          <div className="h-56 w-56 overflow-hidden rounded-lg border border-border bg-muted/30 mx-auto">
             {resolveImageUrl(product.imageUrl) ? (
               <img
                 src={resolveImageUrl(product.imageUrl)!}
@@ -82,22 +81,26 @@ export function ProductDetailsDialog({ open, onOpenChange, product, isAdmin, onE
                 className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-32 w-32 items-center justify-center opacity-60">
+              <div className="flex h-full w-full items-center justify-center opacity-60">
                 <CatPlaceholder />
               </div>
             )}
           </div>
 
-          {product.description && (
-            <p className="text-base leading-relaxed text-foreground">{product.description}</p>
-          )}
-
-          <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-4 py-3">
-            <span className="text-sm text-muted-foreground">Preço</span>
-            <span className="text-base font-semibold tabular-nums text-primary">
-              {brl(product.price)}
-            </span>
+          <div className="text-lg font-semibold tabular-nums text-primary text-right">
+            {brl(product.price)}
           </div>
+
+          {product.description && (
+            <fieldset className="relative rounded-lg border border-border bg-muted/40">
+              <legend className="ml-3 px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-background">
+                Descrição
+              </legend>
+              <div className="px-4 py-3">
+                <p className="text-sm leading-relaxed text-foreground">{product.description}</p>
+              </div>
+            </fieldset>
+          )}
         </div>
 
         <DialogFooter className="flex justify-between">

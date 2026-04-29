@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import {
   Dialog,
@@ -47,10 +47,25 @@ export function OrderFormDialog({ open, onOpenChange, onSaved, order }: Props) {
   const [products, setProducts] = useState<Product[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<string>("");
-  const [customerName, setCustomerName] = useState<string>("");
+  // Uncontrolled input: avoid re-renders on every keystroke
+  const customerNameRef = useRef<HTMLInputElement>(null);
   const [discountType, setDiscountType] = useState<"PERCENT" | "VALUE">("PERCENT");
   const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [submitting, setSubmitting] = useState(false);
+
+  const resetForm = useCallback(() => {
+    setLines([]);
+    setSelectedProduct("");
+    setDiscountType("PERCENT");
+    setDiscountAmount(0);
+    if (customerNameRef.current) customerNameRef.current.value = "";
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      resetForm();
+    };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -58,12 +73,12 @@ export function OrderFormDialog({ open, onOpenChange, onSaved, order }: Props) {
     setSelectedProduct("");
     if (order) {
       setLines(order.items.map((it) => ({ productId: it.productId, quantity: it.quantity })));
-      setCustomerName(order.customerName ?? "");
+      if (customerNameRef.current) customerNameRef.current.value = order.customerName ?? "";
       setDiscountType(order.discountType);
       setDiscountAmount(order.discountAmount);
     } else {
       setLines([]);
-      setCustomerName("");
+      if (customerNameRef.current) customerNameRef.current.value = "";
       setDiscountType("PERCENT");
       setDiscountAmount(0);
     }
@@ -110,6 +125,7 @@ export function OrderFormDialog({ open, onOpenChange, onSaved, order }: Props) {
     }
     setSubmitting(true);
     try {
+      const customerName = customerNameRef.current?.value ?? "";
       const payload = {
         items: lines,
         discountType,
@@ -149,9 +165,9 @@ export function OrderFormDialog({ open, onOpenChange, onSaved, order }: Props) {
           <div className="space-y-1.5">
             <Label>Cliente (opcional)</Label>
             <Input
-              value={customerName}
+              ref={customerNameRef}
               maxLength={150}
-              onChange={(e) => setCustomerName(e.target.value)}
+              defaultValue=""
               placeholder="Nome do cliente"
             />
           </div>
@@ -204,9 +220,12 @@ export function OrderFormDialog({ open, onOpenChange, onSaved, order }: Props) {
                       </Button>
                       <Input
                         type="number"
-                        min={1}
+                        min="1"
                         value={l.quantity}
-                        onChange={(e) => updateQty(l.productId, parseInt(e.target.value) || 1)}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          updateQty(l.productId, Math.max(1, val));
+                        }}
                         className="h-7 w-14 text-center"
                       />
                       <Button
@@ -253,9 +272,12 @@ export function OrderFormDialog({ open, onOpenChange, onSaved, order }: Props) {
                 <Label>Desconto</Label>
                 <Input
                   type="number"
-                  min={0}
+                  min="0"
                   value={discountAmount}
-                  onChange={(e) => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    setDiscountAmount(Math.max(0, val));
+                  }}
                   placeholder={discountType === "PERCENT" ? "0%" : "R$ 0,00"}
                 />
               </div>
