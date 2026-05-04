@@ -34,12 +34,12 @@ interface BackendOrderSummary {
   createdAt: string;
   total: number;
   discount: number;
-  user: { id: string; username: string };
+  user: { id: string; name: string };
   completedAt?: string | null;
   canceledAt?: string | null;
   customerName?: string | null;
-  completedByUsername?: string | null;
-  canceledByUsername?: string | null;
+  completedByName?: string | null;
+  canceledByName?: string | null;
 }
 
 interface BackendOrderDetail extends BackendOrderSummary {
@@ -62,7 +62,7 @@ function mapDetail(order: BackendOrderDetail): Order {
     orderCode: order.orderCode ?? "",
     status: order.status as OrderStatus,
     createdAt: order.createdAt,
-    createdByName: order.user.username,
+    createdByName: order.user.name,
     items: order.items.map(mapItem),
     discountType: "VALUE",
     discountAmount: Number(order.discount ?? 0),
@@ -70,8 +70,8 @@ function mapDetail(order: BackendOrderDetail): Order {
     completedAt: order.completedAt ?? null,
     canceledAt: order.canceledAt ?? null,
     customerName: order.customerName ?? null,
-    completedByUsername: order.completedByUsername ?? null,
-    canceledByUsername: order.canceledByUsername ?? null,
+    completedByName: order.completedByName ?? null,
+    canceledByName: order.canceledByName ?? null,
   };
 }
 

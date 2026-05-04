@@ -60,10 +60,10 @@ export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
                 <div className="font-medium">{dateTime(order.completedAt)}</div>
               </div>
             )}
-            {order.completedByUsername && (
+            {order.completedByName && (
               <div>
                 <div className="text-xs text-muted-foreground">Finalizado por</div>
-                <div className="font-medium">{order.completedByUsername}</div>
+                <div className="font-medium">{order.completedByName}</div>
               </div>
             )}
             {order.canceledAt && (
@@ -72,10 +72,10 @@ export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
                 <div className="font-medium">{dateTime(order.canceledAt)}</div>
               </div>
             )}
-            {order.canceledByUsername && (
+            {order.canceledByName && (
               <div>
                 <div className="text-xs text-muted-foreground">Cancelado por</div>
-                <div className="font-medium">{order.canceledByUsername}</div>
+                <div className="font-medium">{order.canceledByName}</div>
               </div>
             )}
           </div>

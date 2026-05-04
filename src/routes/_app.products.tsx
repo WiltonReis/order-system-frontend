@@ -54,7 +54,7 @@ export const Route = createFileRoute("/_app/products")({
 
 function ProductsPage() {
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = user?.role === "ADMIN" || user?.role === "ADMIN_MASTER";
   const queryClient = useQueryClient();
 
   const [page, setPage] = useState(0);

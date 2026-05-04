@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { createFileRoute, useNavigate, Navigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Navigate, Link } from "@tanstack/react-router";
 import { Package } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,7 @@ function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await login(username.trim(), password);
+      await login(email.trim(), password);
       navigate({ to: "/orders" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao entrar");
@@ -65,14 +65,15 @@ function LoginPage() {
           className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
         >
           <div className="space-y-1.5">
-            <Label htmlFor="username">Usuário</Label>
+            <Label htmlFor="email">E-mail</Label>
             <Input
-              id="username"
+              id="email"
+              type="email"
               autoFocus
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="Usuário"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu@email.com"
               required
             />
           </div>
@@ -100,6 +101,12 @@ function LoginPage() {
             {loading ? "Entrando..." : "Entrar"}
           </Button>
 
+          <p className="text-center text-xs text-muted-foreground">
+            Ainda não tem conta?{" "}
+            <Link to="/register" className="underline-offset-2 hover:underline">
+              Clique aqui para realizar o registro
+            </Link>
+          </p>
         </form>
       </div>
     </main>

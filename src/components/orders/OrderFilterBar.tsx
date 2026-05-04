@@ -175,7 +175,7 @@ export function OrderFilterBar({ onApply }: Props) {
                 </SelectItem>
                 {users.map((u) => (
                   <SelectItem key={u.id} value={u.id} className="text-sm">
-                    {u.username}
+                    {u.name}
                   </SelectItem>
                 ))}
               </SelectContent>

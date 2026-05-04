@@ -1,4 +1,4 @@
-export type Role = "ADMIN" | "USER";
+export type Role = "ADMIN_MASTER" | "ADMIN" | "USER";
 
 export interface PageResponse<T> {
   content: T[];
@@ -14,7 +14,8 @@ export type OrderStatus = "OPEN" | "COMPLETED" | "CANCELED";
 export interface User {
   id: string;
   name: string;
-  username: string;
+  email: string;
+  customerSaasId?: string;
   role: Role;
 }
 
@@ -51,8 +52,8 @@ export interface Order {
   completedAt?: string | null;
   canceledAt?: string | null;
   customerName?: string | null;
-  completedByUsername?: string | null;
-  canceledByUsername?: string | null;
+  completedByName?: string | null;
+  canceledByName?: string | null;
 }
 
 export interface CreateOrderPayload {

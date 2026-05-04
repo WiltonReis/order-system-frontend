@@ -56,6 +56,10 @@ export const Route = createFileRoute("/_app/users")({
   component: UsersPage,
 });
 
+function isAdminMaster(u: User) {
+  return u.role === "ADMIN_MASTER";
+}
+
 function UsersPage() {
   const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
@@ -64,13 +68,15 @@ function UsersPage() {
   const [totalPages, setTotalPages] = useState(0);
   const [loadKey, setLoadKey] = useState(0);
   const [createOpen, setCreateOpen] = useState(false);
-  const [newUsername, setNewUsername] = useState("");
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<Role>("USER");
 
   const [editOpen, setEditOpen] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
-  const [editUsername, setEditUsername] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
   const [editRole, setEditRole] = useState<Role>("USER");
 
@@ -96,7 +102,7 @@ function UsersPage() {
 
   const refresh = () => setLoadKey((k) => k + 1);
 
-  if (user && user.role !== "ADMIN") return <Navigate to="/orders" />;
+  if (user && user.role !== "ADMIN" && user.role !== "ADMIN_MASTER") return <Navigate to="/orders" />;
 
   const handleRoleChange = async (id: string, role: Role) => {
     try {
@@ -125,8 +131,12 @@ function UsersPage() {
   };
 
   const handleCreate = async () => {
-    if (!newUsername.trim()) {
-      toast.error("Preencha o nome de usuário");
+    if (!newName.trim()) {
+      toast.error("Preencha o nome");
+      return;
+    }
+    if (!newEmail.trim()) {
+      toast.error("Preencha o e-mail");
       return;
     }
     if (!newPassword.trim()) {
@@ -134,9 +144,10 @@ function UsersPage() {
       return;
     }
     try {
-      await createUser({ name: newUsername.trim(), username: newUsername.trim(), password: newPassword, role: newRole });
+      await createUser({ name: newName.trim(), email: newEmail.trim(), password: newPassword, role: newRole });
       toast.success("Usuário criado");
-      setNewUsername("");
+      setNewName("");
+      setNewEmail("");
       setNewPassword("");
       setNewRole("USER");
       setCreateOpen(false);
@@ -148,7 +159,8 @@ function UsersPage() {
 
   const openEdit = (u: User) => {
     setEditUser(u);
-    setEditUsername(u.username);
+    setEditName(u.name);
+    setEditEmail(u.email);
     setEditPassword("");
     setEditRole(u.role);
     setEditOpen(true);
@@ -156,13 +168,18 @@ function UsersPage() {
 
   const handleEdit = async () => {
     if (!editUser) return;
-    if (!editUsername.trim()) {
-      toast.error("Preencha o nome de usuário");
+    if (!editName.trim()) {
+      toast.error("Preencha o nome");
+      return;
+    }
+    if (!editEmail.trim()) {
+      toast.error("Preencha o e-mail");
       return;
     }
     try {
       await updateUser(editUser.id, {
-        username: editUsername.trim(),
+        name: editName.trim(),
+        email: editEmail.trim(),
         password: editPassword || undefined,
         role: editRole,
       });
@@ -204,69 +221,86 @@ function UsersPage() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Nome</TableHead>
-                    <TableHead>Usuário</TableHead>
+                    <TableHead>E-mail</TableHead>
                     <TableHead className="w-[180px]">Permissão</TableHead>
                     <TableHead className="w-[120px] text-right">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((u) => (
-                    <TableRow key={u.id}>
-                      <TableCell className="font-medium">
-                        {u.name}
-                        {u.id === user?.id && (
-                          <Badge variant="secondary" className="ml-2">você</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">@{u.username}</TableCell>
-                      <TableCell>
-                        <Select
-                          value={u.role}
-                          onValueChange={(v) => handleRoleChange(u.id, v as Role)}
-                          disabled={u.id === user?.id}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ADMIN">ADMIN</SelectItem>
-                            <SelectItem value="USER">USER</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 hover:text-primary"
-                                onClick={() => openEdit(u)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Editar usuário</TooltipContent>
-                          </Tooltip>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                onClick={() => handleDeleteClick(u)}
-                                disabled={u.id === user?.id}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Excluir usuário</TooltipContent>
-                          </Tooltip>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {users.map((u) => {
+                    const isMaster = isAdminMaster(u);
+                    const isSelf = u.id === user?.id;
+                    return (
+                      <TableRow key={u.id}>
+                        <TableCell className="font-medium">
+                          {u.name}
+                          {isSelf && (
+                            <Badge variant="secondary" className="ml-2">você</Badge>
+                          )}
+                          {isMaster && (
+                            <Badge variant="outline" className="ml-2 text-[10px]">master</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
+                        <TableCell>
+                          <Select
+                            value={u.role}
+                            onValueChange={(v) => handleRoleChange(u.id, v as Role)}
+                            disabled={isSelf || isMaster}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {isMaster && <SelectItem value="ADMIN_MASTER">ADMIN_MASTER</SelectItem>}
+                              <SelectItem value="ADMIN">ADMIN</SelectItem>
+                              <SelectItem value="USER">USER</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 hover:text-primary"
+                                    onClick={() => openEdit(u)}
+                                    disabled={isMaster}
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {isMaster ? "Não é possível modificar o administrador master" : "Editar usuário"}
+                              </TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    onClick={() => handleDeleteClick(u)}
+                                    disabled={isSelf || isMaster}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {isMaster ? "Não é possível modificar o administrador master" : "Excluir usuário"}
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
               {totalPages > 1 && (
@@ -306,8 +340,12 @@ function UsersPage() {
             </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Usuário (login)</Label>
-                <Input value={newUsername} onChange={(e) => setNewUsername(e.target.value)} placeholder="ex: maria" />
+                <Label>Nome</Label>
+                <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Nome do usuário" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>E-mail</Label>
+                <Input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} placeholder="usuario@empresa.com" />
               </div>
               <div className="space-y-1.5">
                 <Label>Senha</Label>
@@ -343,8 +381,12 @@ function UsersPage() {
             </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Usuário (login)</Label>
-                <Input value={editUsername} onChange={(e) => setEditUsername(e.target.value)} placeholder="ex: maria" />
+                <Label>Nome</Label>
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Nome do usuário" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>E-mail</Label>
+                <Input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="usuario@empresa.com" />
               </div>
               <div className="space-y-1.5">
                 <Label>Nova senha (opcional)</Label>
@@ -375,13 +417,12 @@ function UsersPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Confirmation dialog for delete */}
         <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
               <AlertDialogDescription>
-                O usuário "{deleteTarget?.username}" será permanentemente removido do sistema. Essa ação não pode ser desfeita.
+                O usuário "{deleteTarget?.name}" será permanentemente removido do sistema. Essa ação não pode ser desfeita.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
