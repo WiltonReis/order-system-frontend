@@ -1,9 +1,16 @@
 import axios from "axios";
 
-console.log("API URL:", import.meta.env.VITE_API_URL);
+// VITE_API_URL é injetado em build time pelo Vite a partir de
+// .env.development (vite dev) ou .env.production (vite build).
+const baseURL = import.meta.env.VITE_API_URL;
+if (!baseURL) {
+  throw new Error(
+    "VITE_API_URL não definido. Verifique .env.development / .env.production antes do build.",
+  );
+}
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api",
+  baseURL,
   headers: { "Content-Type": "application/json" },
   // Envia cookies httpOnly automaticamente em todas as requisições
   withCredentials: true,
@@ -83,8 +90,7 @@ api.interceptors.response.use(
 export function resolveImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   if (url.startsWith("/")) {
-    const base = (import.meta.env.VITE_API_URL as string | undefined) ?? "";
-    return base + url;
+    return baseURL + url;
   }
   return url;
 }
