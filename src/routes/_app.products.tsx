@@ -1,4 +1,6 @@
 import { useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, ChevronRight, Eye, Package, Pencil, Plus, Trash2 } from "lucide-react";
@@ -46,6 +48,8 @@ import {
 import { ProductDetailsDialog } from "@/components/orders/ProductDetailsDialog";
 import type { Product } from "@/lib/types";
 import { toast } from "sonner";
+import { productSchema } from "@/schemas/productSchema";
+import type { ProductFormValues } from "@/schemas/productSchema";
 
 export const Route = createFileRoute("/_app/products")({
   head: () => ({ meta: [{ title: "Produtos — OMS" }] }),
@@ -59,7 +63,6 @@ function ProductsPage() {
 
   const [page, setPage] = useState(0);
 
-  // File input refs for image upload
   const newImageInputRef = useRef<HTMLInputElement>(null);
   const editImageInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,29 +76,29 @@ function ProductsPage() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["products"] });
 
-  // Estado do dialog de criação
   const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [newPrice, setNewPrice] = useState("");
   const [newImageFile, setNewImageFile] = useState<File | null>(null);
   const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
 
-  // Estado do dialog de visualização
   const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
 
-  // Estado do dialog de edição completa
   const [editOpen, setEditOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Product | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editPrice, setEditPrice] = useState("");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
   const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
 
-  // Estado do dialog de confirmação de exclusão
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+
+  const createForm = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema),
+    defaultValues: { name: "", description: "", price: 0 },
+  });
+
+  const editForm = useForm<ProductFormValues>({
+    resolver: zodResolver(productSchema),
+    defaultValues: { name: "", description: "", price: 0 },
+  });
 
   function handleImageSelect(
     file: File | undefined,
@@ -116,24 +119,43 @@ function ProductsPage() {
 
   const openEdit = (p: Product) => {
     setEditTarget(p);
-    setEditName(p.name);
-    setEditDescription(p.description ?? "");
-    setEditPrice(String(p.price));
+    editForm.reset({ name: p.name, description: p.description ?? "", price: p.price });
     setEditOpen(true);
   };
 
-  const handleSaveEdit = async () => {
-    if (!editTarget) return;
-    const price = parseFloat(editPrice);
-    if (!editName.trim() || isNaN(price) || price < 0) {
-      toast.error("Preencha nome e preço válidos");
-      return;
+  const handleCreate = createForm.handleSubmit(async (values) => {
+    try {
+      const product = await createProduct({
+        name: values.name.trim(),
+        description: values.description?.trim(),
+        price: values.price,
+      });
+      if (newImageFile) {
+        try {
+          await uploadProductImage(product.id, newImageFile);
+        } catch (e) {
+          toast.error(extractErrorMessage(e, "Erro ao enviar imagem"));
+        }
+      }
+      toast.success("Produto criado");
+      createForm.reset();
+      if (newImagePreview) URL.revokeObjectURL(newImagePreview);
+      setNewImageFile(null);
+      setNewImagePreview(null);
+      setCreateOpen(false);
+      invalidate();
+    } catch (e) {
+      toast.error(extractErrorMessage(e, "Erro ao criar produto"));
     }
+  });
+
+  const handleSaveEdit = editForm.handleSubmit(async (values) => {
+    if (!editTarget) return;
     try {
       await updateProduct(editTarget.id, {
-        name: editName.trim(),
-        description: editDescription.trim(),
-        price,
+        name: values.name.trim(),
+        description: values.description?.trim(),
+        price: values.price,
       });
       if (editImageFile) {
         try {
@@ -151,11 +173,7 @@ function ProductsPage() {
     } catch (e) {
       toast.error(extractErrorMessage(e, "Erro ao atualizar produto"));
     }
-  };
-
-  const handleDeleteClick = (p: Product) => {
-    setDeleteTarget(p);
-  };
+  });
 
   const executeDelete = async () => {
     if (!deleteTarget) return;
@@ -166,35 +184,6 @@ function ProductsPage() {
       invalidate();
     } catch (e) {
       toast.error(extractErrorMessage(e, "Erro ao excluir produto"));
-    }
-  };
-
-  const handleCreate = async () => {
-    const price = parseFloat(newPrice);
-    if (!newName.trim() || isNaN(price) || price < 0) {
-      toast.error("Preencha nome e preço válidos");
-      return;
-    }
-    try {
-      const product = await createProduct({ name: newName.trim(), description: newDescription.trim(), price });
-      if (newImageFile) {
-        try {
-          await uploadProductImage(product.id, newImageFile);
-        } catch (e) {
-          toast.error(extractErrorMessage(e, "Erro ao enviar imagem"));
-        }
-      }
-      toast.success("Produto criado");
-      setNewName("");
-      setNewDescription("");
-      setNewPrice("");
-      if (newImagePreview) URL.revokeObjectURL(newImagePreview);
-      setNewImageFile(null);
-      setNewImagePreview(null);
-      setCreateOpen(false);
-      invalidate();
-    } catch (e) {
-      toast.error(extractErrorMessage(e, "Erro ao criar produto"));
     }
   };
 
@@ -287,6 +276,7 @@ function ProductsPage() {
         {isAdmin && (
           <Dialog open={createOpen} onOpenChange={(open) => {
             if (!open) {
+              createForm.reset();
               if (newImagePreview) URL.revokeObjectURL(newImagePreview);
               setNewImageFile(null);
               setNewImagePreview(null);
@@ -301,17 +291,15 @@ function ProductsPage() {
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <Label>Nome</Label>
-                  <Input
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                    placeholder="Ex: Notebook Pro 14"
-                  />
+                  <Input {...createForm.register("name")} placeholder="Ex: Notebook Pro 14" />
+                  {createForm.formState.errors.name && (
+                    <p className="text-xs text-destructive">{createForm.formState.errors.name.message}</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Descrição (opcional)</Label>
                   <Textarea
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
+                    {...createForm.register("description")}
                     placeholder="Descreva o produto em até 200 caracteres"
                     maxLength={200}
                     rows={3}
@@ -323,13 +311,12 @@ function ProductsPage() {
                     type="number"
                     step="0.01"
                     min="0"
-                    value={newPrice}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0;
-                      setNewPrice(String(Math.max(0, val)));
-                    }}
+                    {...createForm.register("price", { valueAsNumber: true })}
                     placeholder="0,00"
                   />
+                  {createForm.formState.errors.price && (
+                    <p className="text-xs text-destructive">{createForm.formState.errors.price.message}</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Imagem (opcional)</Label>
@@ -364,10 +351,11 @@ function ProductsPage() {
           </Dialog>
         )}
 
-        {/* Dialog de edição completa (nome, descrição, preço) */}
+        {/* Dialog de edição */}
         {isAdmin && (
           <Dialog open={editOpen} onOpenChange={(open) => {
             if (!open) {
+              editForm.reset();
               if (editImagePreview) URL.revokeObjectURL(editImagePreview);
               setEditImageFile(null);
               setEditImagePreview(null);
@@ -382,17 +370,15 @@ function ProductsPage() {
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <Label>Nome</Label>
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="Ex: Notebook Pro 14"
-                  />
+                  <Input {...editForm.register("name")} placeholder="Ex: Notebook Pro 14" />
+                  {editForm.formState.errors.name && (
+                    <p className="text-xs text-destructive">{editForm.formState.errors.name.message}</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Descrição (opcional)</Label>
                   <Textarea
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
+                    {...editForm.register("description")}
                     placeholder="Descreva o produto em até 200 caracteres"
                     maxLength={200}
                     rows={3}
@@ -404,13 +390,12 @@ function ProductsPage() {
                     type="number"
                     step="0.01"
                     min="0"
-                    value={editPrice}
-                    onChange={(e) => {
-                      const val = parseFloat(e.target.value) || 0;
-                      setEditPrice(String(Math.max(0, val)));
-                    }}
+                    {...editForm.register("price", { valueAsNumber: true })}
                     placeholder="0,00"
                   />
+                  {editForm.formState.errors.price && (
+                    <p className="text-xs text-destructive">{editForm.formState.errors.price.message}</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Imagem (opcional)</Label>
@@ -455,10 +440,9 @@ function ProductsPage() {
           product={detailsProduct}
           isAdmin={isAdmin}
           onEdit={openEdit}
-          onDelete={handleDeleteClick}
+          onDelete={setDeleteTarget}
         />
 
-        {/* Confirmation dialog for delete */}
         <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>

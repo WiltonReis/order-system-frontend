@@ -1,10 +1,13 @@
-import { useState, type FormEvent } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute, useNavigate, Navigate, Link } from "@tanstack/react-router";
 import { Package } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { loginSchema } from "@/schemas/loginSchema";
+import type { LoginFormValues } from "@/schemas/loginSchema";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -16,24 +19,24 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    setError,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+  });
 
   if (isAuthenticated) return <Navigate to="/orders" />;
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  const onSubmit = async (values: LoginFormValues) => {
     try {
-      await login(email.trim(), password);
+      await login(values.email.trim(), values.password);
       navigate({ to: "/orders" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao entrar");
-    } finally {
-      setLoading(false);
+      setError("root", { message: err instanceof Error ? err.message : "Erro ao entrar" });
     }
   };
 
@@ -61,7 +64,7 @@ function LoginPage() {
         </div>
 
         <form
-          onSubmit={onSubmit}
+          onSubmit={handleSubmit(onSubmit)}
           className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
         >
           <div className="space-y-1.5">
@@ -71,11 +74,12 @@ function LoginPage() {
               type="email"
               autoFocus
               autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               placeholder="seu@email.com"
-              required
+              {...register("email")}
             />
+            {errors.email && (
+              <p className="text-xs text-destructive">{errors.email.message}</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -84,21 +88,22 @@ function LoginPage() {
               id="password"
               type="password"
               autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••"
-              required
+              {...register("password")}
             />
+            {errors.password && (
+              <p className="text-xs text-destructive">{errors.password.message}</p>
+            )}
           </div>
 
-          {error && (
+          {errors.root && (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-              {error}
+              {errors.root.message}
             </div>
           )}
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Entrando..." : "Entrar"}
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Entrando..." : "Entrar"}
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">

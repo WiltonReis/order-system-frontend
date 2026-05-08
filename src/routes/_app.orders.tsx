@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, ChevronLeft, ChevronRight, Eye, Pencil, Plus, ShoppingCart, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -24,16 +25,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { cancelOrder, finalizeOrder, listOrders } from "@/services/orderService";
 import type { OrderFilters } from "@/services/orderService";
 import { extractErrorMessage } from "@/lib/api";
-import type { Order, OrderStatus } from "@/lib/types";
+import type { Order } from "@/lib/types";
 import { brl, dateTime } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
 import { OrderFormDialog } from "@/components/orders/OrderFormDialog";
 import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
 import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 import { OrderFilterBar } from "@/components/orders/OrderFilterBar";
+import { useActiveOrders, useCancelOrder, useFinalizeOrder, useHistoryOrders } from "@/hooks/queries/useOrders";
 
 export const Route = createFileRoute("/_app/orders")({
   head: () => ({
@@ -46,69 +47,25 @@ type ConfirmAction = { type: "finalize" | "cancel"; order: Order };
 
 function OrdersPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  // Per-tab independent state
-  const [activeOrders, setActiveOrders] = useState<Order[]>([]);
-  const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
   const [activePage, setActivePage] = useState(0);
   const [historyPage, setHistoryPage] = useState(0);
-  const [activeTotalPages, setActiveTotalPages] = useState(0);
-  const [historyTotalPages, setHistoryTotalPages] = useState(0);
-  const [activeLoading, setActiveLoading] = useState(true);
-  const [historyLoading, setHistoryLoading] = useState(true);
-
-  const [loadKey, setLoadKey] = useState(0);
   const [filters, setFilters] = useState<OrderFilters>({});
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
-  // Active tab always fetches OPEN orders; respects user status filter when it includes OPEN
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setActiveLoading(true);
-      const tabStatuses: OrderStatus[] = filters.statuses?.length
-        ? filters.statuses.filter((s) => s === "OPEN")
-        : ["OPEN"];
-      try {
-        const result = await listOrders(activePage, 20, { ...filters, statuses: tabStatuses });
-        if (!cancelled) {
-          setActiveOrders(result.content);
-          setActiveTotalPages(result.totalPages);
-        }
-      } finally {
-        if (!cancelled) setActiveLoading(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [activePage, loadKey, filters]);
+  const activeQuery = useActiveOrders(activePage, filters);
+  const historyQuery = useHistoryOrders(historyPage, filters);
+  const finalizeMutation = useFinalizeOrder();
+  const cancelMutation = useCancelOrder();
 
-  // History tab always fetches COMPLETED/CANCELED orders
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setHistoryLoading(true);
-      const tabStatuses: OrderStatus[] = filters.statuses?.length
-        ? filters.statuses.filter((s) => s === "COMPLETED" || s === "CANCELED")
-        : ["COMPLETED", "CANCELED"];
-      try {
-        const result = await listOrders(historyPage, 20, { ...filters, statuses: tabStatuses });
-        if (!cancelled) {
-          setHistoryOrders(result.content);
-          setHistoryTotalPages(result.totalPages);
-        }
-      } finally {
-        if (!cancelled) setHistoryLoading(false);
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-  }, [historyPage, loadKey, filters]);
-
-  const refresh = () => setLoadKey((k) => k + 1);
+  const activeOrders = activeQuery.data?.content ?? [];
+  const historyOrders = historyQuery.data?.content ?? [];
+  const activeTotalPages = activeQuery.data?.totalPages ?? 0;
+  const historyTotalPages = historyQuery.data?.totalPages ?? 0;
 
   const handleApplyFilters = (newFilters: OrderFilters) => {
     setFilters(newFilters);
@@ -131,19 +88,20 @@ function OrdersPage() {
     setDetailsOpen(true);
   };
 
+  const onSaved = () => queryClient.invalidateQueries({ queryKey: ["orders"] });
+
   const executeAction = async () => {
     if (!confirmAction) return;
     const { type, order } = confirmAction;
     setConfirmAction(null);
     try {
       if (type === "finalize") {
-        await finalizeOrder(order.id);
+        await finalizeMutation.mutateAsync(order.id);
         toast.success("Pedido finalizado");
       } else {
-        await cancelOrder(order.id);
+        await cancelMutation.mutateAsync(order.id);
         toast.success("Pedido cancelado");
       }
-      refresh();
     } catch (e) {
       toast.error(extractErrorMessage(e, "Erro ao atualizar pedido"));
     }
@@ -225,7 +183,6 @@ function OrdersPage() {
         </div>
 
         <Tabs defaultValue="active">
-          {/* Tabs header row: [Ativos | Histórico] ........... [Filtrar] */}
           <div className="flex items-center justify-between">
             <TabsList>
               <TabsTrigger value="active" className="relative">
@@ -244,7 +201,7 @@ function OrdersPage() {
           {/* ── Active orders tab ── */}
           <TabsContent value="active">
             <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-              {activeLoading ? (
+              {activeQuery.isPending ? (
                 <div className="p-10 text-center text-sm text-muted-foreground">Carregando...</div>
               ) : activeOrders.length === 0 ? (
                 emptyState("Nenhum pedido ativo.")
@@ -330,7 +287,7 @@ function OrdersPage() {
           {/* ── History tab ── */}
           <TabsContent value="history">
             <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-              {historyLoading ? (
+              {historyQuery.isPending ? (
                 <div className="p-10 text-center text-sm text-muted-foreground">Carregando...</div>
               ) : historyOrders.length === 0 ? (
                 emptyState("Nenhum pedido no histórico.")
@@ -425,9 +382,8 @@ function OrdersPage() {
           <OrderFormDialog
             open={formOpen}
             onOpenChange={setFormOpen}
-            createdByName={user.name}
             order={activeOrder}
-            onSaved={refresh}
+            onSaved={onSaved}
           />
         )}
         <OrderDetailsDialog open={detailsOpen} onOpenChange={setDetailsOpen} order={activeOrder} />

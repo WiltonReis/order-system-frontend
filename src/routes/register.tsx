@@ -1,4 +1,5 @@
-import { useState, type FormEvent } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute, useNavigate, Navigate, Link } from "@tanstack/react-router";
 import { Package } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -8,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { registerSchema } from "@/schemas/registerSchema";
+import type { RegisterFormValues } from "@/schemas/registerSchema";
 
 export const Route = createFileRoute("/register")({
   head: () => ({
@@ -20,31 +23,29 @@ function RegisterPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  const [companyName, setCompanyName] = useState("");
-  const [cpfCnpj, setCpfCnpj] = useState("");
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<RegisterFormValues>({
+    resolver: zodResolver(registerSchema),
+  });
 
   if (isAuthenticated) return <Navigate to="/orders" />;
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (password !== confirmPassword) {
-      toast.error("As senhas não coincidem");
-      return;
-    }
-    setLoading(true);
+  const onSubmit = async (values: RegisterFormValues) => {
     try {
-      await registerRequest({ companyName, cpfCnpj, name, email, password });
+      await registerRequest({
+        companyName: values.companyName,
+        cpfCnpj: values.cpfCnpj,
+        name: values.name,
+        email: values.email,
+        password: values.password,
+      });
       toast.success("Conta criada com sucesso. Faça login para continuar.");
       navigate({ to: "/login" });
     } catch (err) {
       toast.error(extractErrorMessage(err, "Erro ao criar conta"));
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -72,7 +73,7 @@ function RegisterPage() {
         </div>
 
         <form
-          onSubmit={onSubmit}
+          onSubmit={handleSubmit(onSubmit)}
           className="space-y-4 rounded-2xl border border-border bg-card p-6 shadow-[var(--shadow-card)]"
         >
           <div className="space-y-1.5">
@@ -80,34 +81,37 @@ function RegisterPage() {
             <Input
               id="companyName"
               autoFocus
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
               placeholder="Empresa Ltda."
-              required
+              {...register("companyName")}
             />
+            {errors.companyName && (
+              <p className="text-xs text-destructive">{errors.companyName.message}</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="cpfCnpj">CPF / CNPJ</Label>
             <Input
               id="cpfCnpj"
-              value={cpfCnpj}
-              onChange={(e) => setCpfCnpj(e.target.value)}
               placeholder="00000000000000"
               maxLength={18}
-              required
+              {...register("cpfCnpj")}
             />
+            {errors.cpfCnpj && (
+              <p className="text-xs text-destructive">{errors.cpfCnpj.message}</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="name">Nome do administrador</Label>
             <Input
               id="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
               placeholder="Seu nome"
-              required
+              {...register("name")}
             />
+            {errors.name && (
+              <p className="text-xs text-destructive">{errors.name.message}</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -116,11 +120,12 @@ function RegisterPage() {
               id="email"
               type="email"
               autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               placeholder="admin@empresa.com"
-              required
+              {...register("email")}
             />
+            {errors.email && (
+              <p className="text-xs text-destructive">{errors.email.message}</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -129,11 +134,12 @@ function RegisterPage() {
               id="password"
               type="password"
               autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••"
-              required
+              {...register("password")}
             />
+            {errors.password && (
+              <p className="text-xs text-destructive">{errors.password.message}</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -142,15 +148,16 @@ function RegisterPage() {
               id="confirmPassword"
               type="password"
               autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="••••••"
-              required
+              {...register("confirmPassword")}
             />
+            {errors.confirmPassword && (
+              <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
+            )}
           </div>
 
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Criando conta..." : "Criar conta"}
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Criando conta..." : "Criar conta"}
           </Button>
 
           <p className="text-center text-xs text-muted-foreground">

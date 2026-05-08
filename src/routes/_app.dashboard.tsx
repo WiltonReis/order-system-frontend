@@ -1,9 +1,9 @@
+import { useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { useAuth } from "@/context/AuthContext";
-import { getDashboard, type DashboardPeriod } from "@/services/dashboardService";
-import type { DashboardData } from "@/lib/types";
+import { type DashboardPeriod } from "@/services/dashboardService";
+import { useDashboard } from "@/hooks/queries/useDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
@@ -36,15 +36,7 @@ function DashboardPage() {
   if (!user) return <Navigate to="/login" />;
 
   const [period, setPeriod] = useState<DashboardPeriod>("ALL");
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    getDashboard(period)
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, [period]);
+  const { data, isPending } = useDashboard(period);
 
   return (
     <div className="space-y-6">
@@ -68,7 +60,7 @@ function DashboardPage() {
         </div>
       </div>
 
-      {loading || !data ? (
+      {isPending || !data ? (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i} className="animate-pulse">
