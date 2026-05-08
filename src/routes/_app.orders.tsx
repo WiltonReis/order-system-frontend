@@ -1,29 +1,11 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ChevronLeft, ChevronRight, Eye, Pencil, Plus, ShoppingCart, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, Pencil, Plus, ShoppingCart, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { OrderFilters } from "@/services/orderService";
 import { extractErrorMessage } from "@/lib/api";
@@ -35,6 +17,10 @@ import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
 import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 import { OrderFilterBar } from "@/components/orders/OrderFilterBar";
 import { useActiveOrders, useCancelOrder, useFinalizeOrder, useHistoryOrders } from "@/hooks/queries/useOrders";
+import { DataTable } from "@/shared/components/DataTable";
+import type { TableColumn } from "@/shared/components/DataTable";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
+import { usePagination } from "@/shared/hooks/usePagination";
 
 export const Route = createFileRoute("/_app/orders")({
   head: () => ({
@@ -49,16 +35,16 @@ function OrdersPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const [activePage, setActivePage] = useState(0);
-  const [historyPage, setHistoryPage] = useState(0);
+  const activePag = usePagination();
+  const historyPag = usePagination();
   const [filters, setFilters] = useState<OrderFilters>({});
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
-  const activeQuery = useActiveOrders(activePage, filters);
-  const historyQuery = useHistoryOrders(historyPage, filters);
+  const activeQuery = useActiveOrders(activePag.page, filters);
+  const historyQuery = useHistoryOrders(historyPag.page, filters);
   const finalizeMutation = useFinalizeOrder();
   const cancelMutation = useCancelOrder();
 
@@ -69,8 +55,8 @@ function OrdersPage() {
 
   const handleApplyFilters = (newFilters: OrderFilters) => {
     setFilters(newFilters);
-    setActivePage(0);
-    setHistoryPage(0);
+    activePag.reset();
+    historyPag.reset();
   };
 
   const openCreate = () => {
@@ -107,64 +93,137 @@ function OrdersPage() {
     }
   };
 
-  const emptyState = (label: string) => (
-    <div className="flex flex-col items-center gap-2 p-12 text-center">
-      <ShoppingCart className="h-8 w-8 text-muted-foreground" />
-      <p className="text-sm text-muted-foreground">{label}</p>
-    </div>
-  );
+  const activeColumns: TableColumn<Order>[] = [
+    {
+      header: "Pedido",
+      cell: (o) => <span className="font-mono text-xs font-semibold tracking-widest">#{o.orderCode}</span>,
+    },
+    {
+      header: "Cliente",
+      cell: (o) => (
+        <span className="text-sm">
+          {o.customerName || <span className="text-muted-foreground">—</span>}
+        </span>
+      ),
+    },
+    {
+      header: "Criado em",
+      cell: (o) => <span className="text-sm text-muted-foreground">{dateTime(o.createdAt)}</span>,
+    },
+    {
+      header: "Usuário",
+      cell: (o) => <span className="text-sm">{o.createdByName}</span>,
+    },
+    {
+      header: <span className="block text-center">Itens</span>,
+      className: "text-center",
+      cell: (o) => <Badge variant="secondary">{o.items.length}</Badge>,
+    },
+    {
+      header: <span className="block text-right">Total</span>,
+      className: "text-right",
+      cell: (o) => <span className="font-semibold tabular-nums text-primary">{brl(o.total)}</span>,
+    },
+    {
+      header: <span className="block text-right">Ações</span>,
+      className: "w-[152px]",
+      cell: (o) => (
+        <div className="flex justify-end gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openDetails(o)}>
+                <Eye className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Visualizar pedido</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary" onClick={() => openEdit(o)}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Editar pedido</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-green-600" onClick={() => setConfirmAction({ type: "finalize", order: o })}>
+                <CheckCircle2 className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Finalizar pedido</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" onClick={() => setConfirmAction({ type: "cancel", order: o })}>
+                <XCircle className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Cancelar pedido</TooltipContent>
+          </Tooltip>
+        </div>
+      ),
+    },
+  ];
 
-  const activePagination = activeTotalPages > 1 && (
-    <div className="flex items-center justify-center gap-3 border-t p-3">
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-8 w-8 p-0"
-        disabled={activePage === 0}
-        onClick={() => setActivePage((p) => p - 1)}
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
-      <span className="text-sm text-muted-foreground">
-        {activePage + 1} / {activeTotalPages}
-      </span>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-8 w-8 p-0"
-        disabled={activePage >= activeTotalPages - 1}
-        onClick={() => setActivePage((p) => p + 1)}
-      >
-        <ChevronRight className="h-4 w-4" />
-      </Button>
-    </div>
-  );
+  const historyColumns: TableColumn<Order>[] = [
+    {
+      header: "Pedido",
+      cell: (o) => <span className="font-mono text-xs font-semibold tracking-widest">#{o.orderCode}</span>,
+    },
+    {
+      header: "Cliente",
+      cell: (o) => (
+        <span className="text-sm">
+          {o.customerName || <span className="text-muted-foreground">—</span>}
+        </span>
+      ),
+    },
+    {
+      header: "Criado em",
+      cell: (o) => <span className="text-sm text-muted-foreground">{dateTime(o.createdAt)}</span>,
+    },
+    {
+      header: "Usuário",
+      cell: (o) => <span className="text-sm">{o.createdByName}</span>,
+    },
+    {
+      header: "Status",
+      cell: (o) => <OrderStatusBadge status={o.status} />,
+    },
+    {
+      header: <span className="block text-center">Itens</span>,
+      className: "text-center",
+      cell: (o) => <Badge variant="secondary">{o.items.length}</Badge>,
+    },
+    {
+      header: <span className="block text-right">Total</span>,
+      className: "text-right",
+      cell: (o) => <span className="font-semibold tabular-nums text-primary">{brl(o.total)}</span>,
+    },
+    {
+      header: <span className="block text-right">Ações</span>,
+      className: "w-[60px]",
+      cell: (o) => (
+        <div className="flex justify-end">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openDetails(o)}>
+                <Eye className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Visualizar pedido</TooltipContent>
+          </Tooltip>
+        </div>
+      ),
+    },
+  ];
 
-  const historyPagination = historyTotalPages > 1 && (
-    <div className="flex items-center justify-center gap-3 border-t p-3">
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-8 w-8 p-0"
-        disabled={historyPage === 0}
-        onClick={() => setHistoryPage((p) => p - 1)}
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
-      <span className="text-sm text-muted-foreground">
-        {historyPage + 1} / {historyTotalPages}
-      </span>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-8 w-8 p-0"
-        disabled={historyPage >= historyTotalPages - 1}
-        onClick={() => setHistoryPage((p) => p + 1)}
-      >
-        <ChevronRight className="h-4 w-4" />
-      </Button>
-    </div>
-  );
+  const confirmTitle = confirmAction?.type === "finalize" ? "Finalizar pedido?" : "Cancelar pedido?";
+  const confirmDescription =
+    confirmAction?.type === "finalize"
+      ? "O pedido será marcado como finalizado e não poderá mais ser editado."
+      : "O pedido será cancelado. Essa ação não pode ser desfeita.";
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -198,185 +257,41 @@ function OrdersPage() {
             <OrderFilterBar onApply={handleApplyFilters} />
           </div>
 
-          {/* ── Active orders tab ── */}
           <TabsContent value="active">
-            <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-              {activeQuery.isPending ? (
-                <div className="p-10 text-center text-sm text-muted-foreground">Carregando...</div>
-              ) : activeOrders.length === 0 ? (
-                emptyState("Nenhum pedido ativo.")
-              ) : (
-                <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead>Pedido</TableHead>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead>Criado em</TableHead>
-                        <TableHead>Usuário</TableHead>
-                        <TableHead className="text-center">Itens</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="w-[152px] text-right">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {activeOrders.map((o) => (
-                        <TableRow key={o.id}>
-                          <TableCell>
-                            <span className="font-mono text-xs font-semibold tracking-widest">#{o.orderCode}</span>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {o.customerName || <span className="text-muted-foreground">—</span>}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {dateTime(o.createdAt)}
-                          </TableCell>
-                          <TableCell className="text-sm">{o.createdByName}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="secondary">{o.items.length}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-semibold tabular-nums text-primary">
-                            {brl(o.total)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-1">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openDetails(o)}>
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Visualizar pedido</TooltipContent>
-                              </Tooltip>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary" onClick={() => openEdit(o)}>
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Editar pedido</TooltipContent>
-                              </Tooltip>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-green-600" onClick={() => setConfirmAction({ type: "finalize", order: o })}>
-                                    <CheckCircle2 className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Finalizar pedido</TooltipContent>
-                              </Tooltip>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" onClick={() => setConfirmAction({ type: "cancel", order: o })}>
-                                    <XCircle className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Cancelar pedido</TooltipContent>
-                              </Tooltip>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {activePagination}
-                </>
-              )}
-            </div>
+            <DataTable
+              columns={activeColumns}
+              data={activeOrders}
+              keyExtractor={(o) => o.id}
+              loading={activeQuery.isPending}
+              emptyIcon={<ShoppingCart className="h-8 w-8 text-muted-foreground" />}
+              emptyMessage="Nenhum pedido ativo."
+              pagination={{ page: activePag.page, total: activeTotalPages, onPrev: activePag.prev, onNext: activePag.next }}
+            />
           </TabsContent>
 
-          {/* ── History tab ── */}
           <TabsContent value="history">
-            <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
-              {historyQuery.isPending ? (
-                <div className="p-10 text-center text-sm text-muted-foreground">Carregando...</div>
-              ) : historyOrders.length === 0 ? (
-                emptyState("Nenhum pedido no histórico.")
-              ) : (
-                <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead>Pedido</TableHead>
-                        <TableHead>Cliente</TableHead>
-                        <TableHead>Criado em</TableHead>
-                        <TableHead>Usuário</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-center">Itens</TableHead>
-                        <TableHead className="text-right">Total</TableHead>
-                        <TableHead className="w-[60px] text-right">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {historyOrders.map((o) => (
-                        <TableRow key={o.id} className="opacity-80">
-                          <TableCell>
-                            <span className="font-mono text-xs font-semibold tracking-widest">#{o.orderCode}</span>
-                          </TableCell>
-                          <TableCell className="text-sm">
-                            {o.customerName || <span className="text-muted-foreground">—</span>}
-                          </TableCell>
-                          <TableCell className="text-sm text-muted-foreground">
-                            {dateTime(o.createdAt)}
-                          </TableCell>
-                          <TableCell className="text-sm">{o.createdByName}</TableCell>
-                          <TableCell>
-                            <OrderStatusBadge status={o.status} />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant="secondary">{o.items.length}</Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-semibold tabular-nums text-primary">
-                            {brl(o.total)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openDetails(o)}>
-                                  <Eye className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Visualizar pedido</TooltipContent>
-                            </Tooltip>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  {historyPagination}
-                </>
-              )}
-            </div>
+            <DataTable
+              columns={historyColumns}
+              data={historyOrders}
+              keyExtractor={(o) => o.id}
+              loading={historyQuery.isPending}
+              emptyIcon={<ShoppingCart className="h-8 w-8 text-muted-foreground" />}
+              emptyMessage="Nenhum pedido no histórico."
+              pagination={{ page: historyPag.page, total: historyTotalPages, onPrev: historyPag.prev, onNext: historyPag.next }}
+              rowClassName="opacity-80"
+            />
           </TabsContent>
         </Tabs>
 
-        {/* ── Confirmation dialog ── */}
-        <AlertDialog open={!!confirmAction} onOpenChange={(o) => !o && setConfirmAction(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {confirmAction?.type === "finalize" ? "Finalizar pedido?" : "Cancelar pedido?"}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {confirmAction?.type === "finalize"
-                  ? "O pedido será marcado como finalizado e não poderá mais ser editado."
-                  : "O pedido será cancelado. Essa ação não pode ser desfeita."}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Não</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={executeAction}
-                className={
-                  confirmAction?.type === "cancel"
-                    ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    : ""
-                }
-              >
-                Confirmar
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={!!confirmAction}
+          onOpenChange={(o) => !o && setConfirmAction(null)}
+          title={confirmTitle}
+          description={confirmDescription}
+          onConfirm={executeAction}
+          confirmLabel="Confirmar"
+          destructive={confirmAction?.type === "cancel"}
+        />
 
         {user && (
           <OrderFormDialog

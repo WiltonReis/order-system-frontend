@@ -1,55 +1,20 @@
-import { useRef, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, ChevronRight, Eye, Package, Pencil, Plus, Trash2 } from "lucide-react";
+import { Eye, Package, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/context/AuthContext";
 import { brl } from "@/lib/format";
 import { extractErrorMessage, resolveImageUrl } from "@/lib/api";
-import {
-  createProduct,
-  deleteProduct,
-  listProductsPaged,
-  updateProduct,
-  uploadProductImage,
-} from "@/services/productService";
+import { deleteProduct, listProductsPaged } from "@/services/productService";
 import { ProductDetailsDialog } from "@/components/orders/ProductDetailsDialog";
+import { ProductFormDialog } from "@/components/products/ProductFormDialog";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
+import { usePagination } from "@/shared/hooks/usePagination";
 import type { Product } from "@/lib/types";
 import { toast } from "sonner";
-import { productSchema } from "@/schemas/productSchema";
-import type { ProductFormValues } from "@/schemas/productSchema";
+import { ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/_app/products")({
   head: () => ({ meta: [{ title: "Produtos — OMS" }] }),
@@ -60,11 +25,7 @@ function ProductsPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN" || user?.role === "ADMIN_MASTER";
   const queryClient = useQueryClient();
-
-  const [page, setPage] = useState(0);
-
-  const newImageInputRef = useRef<HTMLInputElement>(null);
-  const editImageInputRef = useRef<HTMLInputElement>(null);
+  const { page, prev, next } = usePagination();
 
   const { data, isPending } = useQuery({
     queryKey: ["products", page],
@@ -76,104 +37,26 @@ function ProductsPage() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["products"] });
 
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newImageFile, setNewImageFile] = useState<File | null>(null);
-  const [newImagePreview, setNewImagePreview] = useState<string | null>(null);
-
+  const [formOpen, setFormOpen] = useState(false);
+  const [formProduct, setFormProduct] = useState<Product | null>(null);
   const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-
-  const [editOpen, setEditOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<Product | null>(null);
-  const [editImageFile, setEditImageFile] = useState<File | null>(null);
-  const [editImagePreview, setEditImagePreview] = useState<string | null>(null);
-
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
 
-  const createForm = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema),
-    defaultValues: { name: "", description: "", price: 0 },
-  });
+  const openCreate = () => {
+    setFormProduct(null);
+    setFormOpen(true);
+  };
 
-  const editForm = useForm<ProductFormValues>({
-    resolver: zodResolver(productSchema),
-    defaultValues: { name: "", description: "", price: 0 },
-  });
-
-  function handleImageSelect(
-    file: File | undefined,
-    prevPreview: string | null,
-    setFile: (f: File | null) => void,
-    setPreview: (s: string | null) => void,
-  ) {
-    if (!file) return;
-    if (prevPreview) URL.revokeObjectURL(prevPreview);
-    setFile(file);
-    setPreview(URL.createObjectURL(file));
-  }
+  const openEdit = (p: Product) => {
+    setFormProduct(p);
+    setFormOpen(true);
+  };
 
   const openDetails = (p: Product) => {
     setDetailsProduct(p);
     setDetailsOpen(true);
   };
-
-  const openEdit = (p: Product) => {
-    setEditTarget(p);
-    editForm.reset({ name: p.name, description: p.description ?? "", price: p.price });
-    setEditOpen(true);
-  };
-
-  const handleCreate = createForm.handleSubmit(async (values) => {
-    try {
-      const product = await createProduct({
-        name: values.name.trim(),
-        description: values.description?.trim(),
-        price: values.price,
-      });
-      if (newImageFile) {
-        try {
-          await uploadProductImage(product.id, newImageFile);
-        } catch (e) {
-          toast.error(extractErrorMessage(e, "Erro ao enviar imagem"));
-        }
-      }
-      toast.success("Produto criado");
-      createForm.reset();
-      if (newImagePreview) URL.revokeObjectURL(newImagePreview);
-      setNewImageFile(null);
-      setNewImagePreview(null);
-      setCreateOpen(false);
-      invalidate();
-    } catch (e) {
-      toast.error(extractErrorMessage(e, "Erro ao criar produto"));
-    }
-  });
-
-  const handleSaveEdit = editForm.handleSubmit(async (values) => {
-    if (!editTarget) return;
-    try {
-      await updateProduct(editTarget.id, {
-        name: values.name.trim(),
-        description: values.description?.trim(),
-        price: values.price,
-      });
-      if (editImageFile) {
-        try {
-          await uploadProductImage(editTarget.id, editImageFile);
-        } catch (e) {
-          toast.error(extractErrorMessage(e, "Erro ao enviar imagem"));
-        }
-      }
-      toast.success("Produto atualizado");
-      if (editImagePreview) URL.revokeObjectURL(editImagePreview);
-      setEditImageFile(null);
-      setEditImagePreview(null);
-      setEditOpen(false);
-      invalidate();
-    } catch (e) {
-      toast.error(extractErrorMessage(e, "Erro ao atualizar produto"));
-    }
-  });
 
   const executeDelete = async () => {
     if (!deleteTarget) return;
@@ -198,7 +81,7 @@ function ProductsPage() {
             </p>
           </div>
           {isAdmin && (
-            <Button onClick={() => setCreateOpen(true)}>
+            <Button onClick={openCreate}>
               <Plus className="mr-2 h-4 w-4" />
               Novo produto
             </Button>
@@ -231,15 +114,37 @@ function ProductsPage() {
                       <h3 className="text-sm font-semibold line-clamp-2">{p.name}</h3>
                       <p className="text-base font-bold text-primary">{brl(p.price)}</p>
                     </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => openDetails(p)}
-                    >
-                      <Eye className="mr-1 h-3 w-3" />
-                      Visualizar
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => openDetails(p)}
+                      >
+                        <Eye className="mr-1 h-3 w-3" />
+                        Visualizar
+                      </Button>
+                      {isAdmin && (
+                        <>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary" onClick={() => openEdit(p)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Editar produto</TooltipContent>
+                          </Tooltip>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" onClick={() => setDeleteTarget(p)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Excluir produto</TooltipContent>
+                          </Tooltip>
+                        </>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -250,7 +155,7 @@ function ProductsPage() {
                     size="sm"
                     className="h-8 w-8 p-0"
                     disabled={page === 0}
-                    onClick={() => setPage((p) => p - 1)}
+                    onClick={prev}
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
@@ -262,7 +167,7 @@ function ProductsPage() {
                     size="sm"
                     className="h-8 w-8 p-0"
                     disabled={page >= totalPages - 1}
-                    onClick={() => setPage((p) => p + 1)}
+                    onClick={next}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -272,166 +177,13 @@ function ProductsPage() {
           )}
         </div>
 
-        {/* Dialog de criação */}
         {isAdmin && (
-          <Dialog open={createOpen} onOpenChange={(open) => {
-            if (!open) {
-              createForm.reset();
-              if (newImagePreview) URL.revokeObjectURL(newImagePreview);
-              setNewImageFile(null);
-              setNewImagePreview(null);
-            }
-            setCreateOpen(open);
-          }}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Novo produto</DialogTitle>
-                <DialogDescription>Cadastre um novo item no catálogo.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label>Nome</Label>
-                  <Input {...createForm.register("name")} placeholder="Ex: Notebook Pro 14" />
-                  {createForm.formState.errors.name && (
-                    <p className="text-xs text-destructive">{createForm.formState.errors.name.message}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Descrição (opcional)</Label>
-                  <Textarea
-                    {...createForm.register("description")}
-                    placeholder="Descreva o produto em até 200 caracteres"
-                    maxLength={200}
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Preço (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    {...createForm.register("price", { valueAsNumber: true })}
-                    placeholder="0,00"
-                  />
-                  {createForm.formState.errors.price && (
-                    <p className="text-xs text-destructive">{createForm.formState.errors.price.message}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Imagem (opcional)</Label>
-                  <div className="flex justify-center">
-                    <div
-                      onClick={() => newImageInputRef.current?.click()}
-                      className="h-32 w-32 cursor-pointer overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/50 hover:bg-muted transition-colors flex items-center justify-center"
-                    >
-                      {newImagePreview ? (
-                        <img src={newImagePreview} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <Pencil className="h-6 w-6 text-muted-foreground" />
-                      )}
-                    </div>
-                  </div>
-                  <input
-                    ref={newImageInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={(e) =>
-                      handleImageSelect(e.target.files?.[0], newImagePreview, setNewImageFile, setNewImagePreview)
-                    }
-                    className="hidden"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancelar</Button>
-                <Button onClick={handleCreate}>Criar</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
-
-        {/* Dialog de edição */}
-        {isAdmin && (
-          <Dialog open={editOpen} onOpenChange={(open) => {
-            if (!open) {
-              editForm.reset();
-              if (editImagePreview) URL.revokeObjectURL(editImagePreview);
-              setEditImageFile(null);
-              setEditImagePreview(null);
-            }
-            setEditOpen(open);
-          }}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Editar produto</DialogTitle>
-                <DialogDescription>Atualize as informações do produto.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label>Nome</Label>
-                  <Input {...editForm.register("name")} placeholder="Ex: Notebook Pro 14" />
-                  {editForm.formState.errors.name && (
-                    <p className="text-xs text-destructive">{editForm.formState.errors.name.message}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Descrição (opcional)</Label>
-                  <Textarea
-                    {...editForm.register("description")}
-                    placeholder="Descreva o produto em até 200 caracteres"
-                    maxLength={200}
-                    rows={3}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Preço (R$)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    {...editForm.register("price", { valueAsNumber: true })}
-                    placeholder="0,00"
-                  />
-                  {editForm.formState.errors.price && (
-                    <p className="text-xs text-destructive">{editForm.formState.errors.price.message}</p>
-                  )}
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Imagem (opcional)</Label>
-                  <div className="flex justify-center">
-                    <div
-                      onClick={() => editImageInputRef.current?.click()}
-                      className="h-32 w-32 cursor-pointer overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted/50 hover:bg-muted transition-colors flex items-center justify-center"
-                    >
-                      {editImagePreview ?? resolveImageUrl(editTarget?.imageUrl) ? (
-                        <img
-                          src={editImagePreview ?? resolveImageUrl(editTarget?.imageUrl)!}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <Pencil className="h-6 w-6 text-muted-foreground" />
-                      )}
-                    </div>
-                  </div>
-                  <input
-                    ref={editImageInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={(e) =>
-                      handleImageSelect(e.target.files?.[0], editImagePreview, setEditImageFile, setEditImagePreview)
-                    }
-                    className="hidden"
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setEditOpen(false)}>Cancelar</Button>
-                <Button onClick={handleSaveEdit}>Salvar</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <ProductFormDialog
+            product={formProduct}
+            open={formOpen}
+            onOpenChange={setFormOpen}
+            onSaved={invalidate}
+          />
         )}
 
         <ProductDetailsDialog
@@ -443,22 +195,15 @@ function ProductsPage() {
           onDelete={setDeleteTarget}
         />
 
-        <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Excluir produto?</AlertDialogTitle>
-              <AlertDialogDescription>
-                O produto "{deleteTarget?.name}" será permanentemente removido do catálogo. Essa ação não pode ser desfeita.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={executeDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Excluir
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={!!deleteTarget}
+          onOpenChange={(o) => !o && setDeleteTarget(null)}
+          title="Excluir produto?"
+          description={`O produto "${deleteTarget?.name}" será permanentemente removido do catálogo. Essa ação não pode ser desfeita.`}
+          onConfirm={executeDelete}
+          confirmLabel="Excluir"
+          destructive
+        />
       </div>
     </TooltipProvider>
   );
