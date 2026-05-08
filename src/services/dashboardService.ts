@@ -9,5 +9,10 @@ export async function getDashboard(period: DashboardPeriod): Promise<DashboardDa
     ...data,
     revenue: Number(data.revenue),
     averageTicket: Number(data.averageTicket),
+    ordersByStatus: data.ordersByStatus ?? { OPEN: 0, COMPLETED: 0, CANCELED: 0 },
+    revenueByDay: (data.revenueByDay ?? []).map((d) => ({
+      ...d,
+      revenue: Number(d.revenue),
+    })),
   };
 }

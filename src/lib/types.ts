@@ -72,10 +72,23 @@ export interface TopProduct {
   totalQuantity: number;
 }
 
+export interface RevenueByDay {
+  date: string;
+  revenue: number;
+}
+
+export interface OrdersByStatus {
+  OPEN: number;
+  COMPLETED: number;
+  CANCELED: number;
+}
+
 export interface DashboardData {
   totalOrders: number;
   revenue: number;
   cancelRate: number;
   averageTicket: number;
   topProducts: TopProduct[];
+  ordersByStatus: OrdersByStatus;
+  revenueByDay: RevenueByDay[];
 }
