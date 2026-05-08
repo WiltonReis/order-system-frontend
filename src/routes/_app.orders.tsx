@@ -131,7 +131,7 @@ function OrdersPage() {
         <div className="flex justify-end gap-1">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openDetails(o)}>
+              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Visualizar pedido" onClick={() => openDetails(o)}>
                 <Eye className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -139,7 +139,7 @@ function OrdersPage() {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary" onClick={() => openEdit(o)}>
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary" aria-label="Editar pedido" onClick={() => openEdit(o)}>
                 <Pencil className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -147,7 +147,7 @@ function OrdersPage() {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-green-600" onClick={() => setConfirmAction({ type: "finalize", order: o })}>
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-green-600" aria-label="Finalizar pedido" onClick={() => setConfirmAction({ type: "finalize", order: o })}>
                 <CheckCircle2 className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -155,7 +155,7 @@ function OrdersPage() {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" onClick={() => setConfirmAction({ type: "cancel", order: o })}>
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" aria-label="Cancelar pedido" onClick={() => setConfirmAction({ type: "cancel", order: o })}>
                 <XCircle className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
@@ -208,7 +208,7 @@ function OrdersPage() {
         <div className="flex justify-end">
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openDetails(o)}>
+              <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Visualizar pedido" onClick={() => openDetails(o)}>
                 <Eye className="h-4 w-4" />
               </Button>
             </TooltipTrigger>

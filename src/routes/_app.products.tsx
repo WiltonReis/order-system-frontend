@@ -128,7 +128,7 @@ function ProductsPage() {
                         <>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary" onClick={() => openEdit(p)}>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-primary" aria-label="Editar produto" onClick={() => openEdit(p)}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>
@@ -136,7 +136,7 @@ function ProductsPage() {
                           </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" onClick={() => setDeleteTarget(p)}>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" aria-label="Excluir produto" onClick={() => setDeleteTarget(p)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>

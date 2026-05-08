@@ -28,6 +28,38 @@ function NotFoundComponent() {
   );
 }
 
+function ErrorFallback({ error, reset }: { error: Error; reset: () => void }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="max-w-md text-center">
+        <h1 className="text-5xl font-bold text-foreground">Algo deu errado</h1>
+        <p className="mt-4 text-sm text-muted-foreground">
+          Ocorreu um erro inesperado. Tente novamente ou volte ao início.
+        </p>
+        {import.meta.env.DEV && (
+          <pre className="mt-4 overflow-auto rounded-md bg-muted p-4 text-left text-xs text-destructive">
+            {error.message}
+          </pre>
+        )}
+        <div className="mt-6 flex justify-center gap-3">
+          <button
+            onClick={reset}
+            className="inline-flex items-center justify-center rounded-md border border-border bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            Tentar novamente
+          </button>
+          <Link
+            to="/"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            Voltar ao início
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -41,6 +73,7 @@ export const Route = createRootRoute({
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
+  errorComponent: ErrorFallback,
 });
 
 function RootShell({ children }: { children: React.ReactNode }) {

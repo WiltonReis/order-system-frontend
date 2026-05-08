@@ -214,6 +214,7 @@ export function OrderFormDialog({ open, onOpenChange, onSaved, order }: Props) {
                         size="icon"
                         variant="outline"
                         className="h-7 w-7"
+                        aria-label="Diminuir quantidade"
                         onClick={() => updateQty(l.productId, l.quantity - 1)}
                       >
                         <Minus className="h-3 w-3" />
@@ -232,6 +233,7 @@ export function OrderFormDialog({ open, onOpenChange, onSaved, order }: Props) {
                         size="icon"
                         variant="outline"
                         className="h-7 w-7"
+                        aria-label="Aumentar quantidade"
                         onClick={() => updateQty(l.productId, l.quantity + 1)}
                       >
                         <Plus className="h-3 w-3" />
@@ -244,6 +246,7 @@ export function OrderFormDialog({ open, onOpenChange, onSaved, order }: Props) {
                       size="icon"
                       variant="ghost"
                       className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      aria-label="Remover item"
                       onClick={() => removeLine(l.productId)}
                     >
                       <Trash2 className="h-4 w-4" />

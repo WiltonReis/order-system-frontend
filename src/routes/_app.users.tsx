@@ -131,6 +131,7 @@ function UsersPage() {
                     size="icon"
                     variant="ghost"
                     className="h-8 w-8 hover:text-primary"
+                    aria-label={isMaster ? "Não é possível modificar o administrador master" : "Editar usuário"}
                     onClick={() => openEdit(u)}
                     disabled={isMaster}
                   >
@@ -149,6 +150,7 @@ function UsersPage() {
                     size="icon"
                     variant="ghost"
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    aria-label={isMaster ? "Não é possível modificar o administrador master" : "Excluir usuário"}
                     onClick={() => setDeleteTarget(u)}
                     disabled={isSelf || isMaster}
                   >
