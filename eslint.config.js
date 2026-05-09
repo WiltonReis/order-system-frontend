@@ -26,6 +26,21 @@ export default tseslint.config(
   },
   eslintPluginPrettier,
   {
+    files: ["src/features/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        {
+          patterns: [
+            { group: ["@/hooks/queries/*"], message: "Old hooks path. Use @/features/<domain>/hooks/ instead." },
+            { group: ["@/schemas/*"], message: "Old schemas path. Use @/features/<domain>/schemas/ instead." },
+            { group: ["@/services/*"], message: "Old services path. Use @/features/<domain>/api/ instead." },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/features/orders/**/*.{ts,tsx}"],
     rules: {
       "no-restricted-imports": [

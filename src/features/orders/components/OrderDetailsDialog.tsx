@@ -39,7 +39,7 @@ export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
               {order.customerName && (
                 <>
                   <span className="text-muted-foreground">•</span>
-                  <span className="text-lg font-semibold text-white">{order.customerName}</span>
+                  <span className="text-lg font-semibold text-foreground">{order.customerName}</span>
                 </>
               )}
             </div>
