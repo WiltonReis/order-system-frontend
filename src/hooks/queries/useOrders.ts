@@ -4,6 +4,7 @@ import {
   deleteOrder,
   finalizeOrder,
   listOrders,
+  listOrderStatusHistory,
   restoreOrder,
 } from "@/services/orderService";
 import type { OrderFilters } from "@/services/orderService";
@@ -58,5 +59,14 @@ export function useRestoreOrder() {
   return useMutation({
     mutationFn: restoreOrder,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+  });
+}
+
+export function useOrderStatusHistory(orderId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["orders", "status-history", orderId],
+    queryFn: () => listOrderStatusHistory(orderId!),
+    enabled: !!orderId,
+    staleTime: 30_000,
   });
 }

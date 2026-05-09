@@ -8,9 +8,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { brl, dateTime } from "@/lib/format";
 import type { Order } from "@/lib/types";
 import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
+import { useOrderStatusHistory } from "@/hooks/queries/useOrders";
 
 interface Props {
   open: boolean;
@@ -19,6 +21,8 @@ interface Props {
 }
 
 export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
+  const historyQuery = useOrderStatusHistory(open ? order?.id : null);
+
   if (!order) return null;
 
   const subtotal = order.items.reduce((acc, it) => acc + it.subtotal, 0);
@@ -44,7 +48,13 @@ export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
           <DialogDescription>Detalhes completos do pedido</DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <Tabs defaultValue="details" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="details">Detalhes</TabsTrigger>
+            <TabsTrigger value="history">Histórico</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details" className="space-y-4">
           <div className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-muted/30 p-3 text-sm">
             <div>
               <div className="text-xs text-muted-foreground">Criado em</div>
@@ -116,7 +126,40 @@ export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
               <span className="tabular-nums text-primary">{brl(order.total)}</span>
             </div>
           </div>
-        </div>
+          </TabsContent>
+
+          <TabsContent value="history">
+            <div className="rounded-lg border border-border bg-card">
+              {historyQuery.isPending && (
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  Carregando histórico…
+                </div>
+              )}
+              {!historyQuery.isPending && (historyQuery.data?.length ?? 0) === 0 && (
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  Nenhuma mudança de status registrada.
+                </div>
+              )}
+              {!historyQuery.isPending && (historyQuery.data?.length ?? 0) > 0 && (
+                <ol className="divide-y divide-border">
+                  {historyQuery.data!.map((h) => (
+                    <li key={h.id} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+                      <OrderStatusBadge status={h.fromStatus} />
+                      <span className="text-muted-foreground">→</span>
+                      <OrderStatusBadge status={h.toStatus} />
+                      <div className="ml-auto text-right">
+                        <div className="text-xs text-muted-foreground">{dateTime(h.changedAt)}</div>
+                        {h.changedBy && (
+                          <div className="text-xs font-medium">{h.changedBy}</div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

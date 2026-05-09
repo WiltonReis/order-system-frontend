@@ -199,3 +199,16 @@ export async function deleteOrder(id: string): Promise<void> {
 export async function restoreOrder(id: string): Promise<void> {
   await api.post(`/orders/${id}/restore`);
 }
+
+export interface OrderStatusHistoryEntry {
+  id: string;
+  fromStatus: OrderStatus;
+  toStatus: OrderStatus;
+  changedAt: string;
+  changedBy: string | null;
+}
+
+export async function listOrderStatusHistory(orderId: string): Promise<OrderStatusHistoryEntry[]> {
+  const { data } = await api.get<OrderStatusHistoryEntry[]>(`/orders/${orderId}/status-history`);
+  return data;
+}
