@@ -1,8 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import { Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 
 export function Hero() {
+  const { isAuthenticated } = useAuth();
+
   return (
     <section className="relative flex min-h-[90vh] flex-col items-center justify-center px-4 text-center">
       <div
@@ -38,14 +41,16 @@ export function Hero() {
           </p>
         </div>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Button asChild size="lg" className="min-w-[140px]">
-            <Link to="/login">Entrar</Link>
-          </Button>
-          <Button asChild size="lg" variant="outline" className="min-w-[140px]">
-            <Link to="/register">Criar conta grátis</Link>
-          </Button>
-        </div>
+        {!isAuthenticated && (
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <Button asChild size="lg" className="min-w-[140px]">
+              <Link to="/login">Entrar</Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="min-w-[140px]">
+              <Link to="/register">Criar conta grátis</Link>
+            </Button>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -1,17 +1,16 @@
 # Stage 1: build
-FROM node:20-alpine AS build
+FROM oven/bun:1-alpine AS build
 
 WORKDIR /app
 
-COPY package.json package-lock.json ./
-RUN npm ci --frozen-lockfile
+COPY package.json ./
+RUN bun install
 
-COPY . .
-
-ARG VITE_API_URL=http://order-system-backend:8080
+ARG VITE_API_URL=http://localhost:8080
 ENV VITE_API_URL=$VITE_API_URL
 
-RUN npm run build
+COPY . .
+RUN bun run build
 
 # Stage 2: serve
 FROM nginx:1.27-alpine
