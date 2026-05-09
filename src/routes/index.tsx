@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useAuth } from "@/context/AuthContext";
-import { Header } from "@/components/layout/Header";
-import { Hero } from "@/components/landing/Hero";
-import { Features } from "@/components/landing/Features";
-import { Footer } from "@/components/landing/Footer";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { Header } from "@/shared/components/layout/Header";
+import { Hero } from "@/features/landing/components/Hero";
+import { Features } from "@/features/landing/components/Features";
+import { Footer } from "@/features/landing/components/Footer";
 
 export const Route = createFileRoute("/")({
   head: () => ({

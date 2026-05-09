@@ -12,15 +12,15 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import type { Role, User } from "@/lib/types";
 import { toast } from "sonner";
-import { useUsers, useUpdateUserRole, useDeleteUser } from "@/hooks/queries/useUsers";
+import { useUsers, useUpdateUserRole, useDeleteUser } from "@/features/users/hooks/useUsers";
 import { usePagination } from "@/shared/hooks/usePagination";
 import { DataTable } from "@/shared/components/DataTable";
 import type { TableColumn } from "@/shared/components/DataTable";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
-import { UserFormDialog } from "@/components/users/UserFormDialog";
+import { UserFormDialog } from "@/features/users/components/UserFormDialog";
 
 export const Route = createFileRoute("/_app/users")({
   head: () => ({ meta: [{ title: "Usuários — OMS" }] }),

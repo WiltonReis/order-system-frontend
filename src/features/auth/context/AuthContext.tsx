@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { userStorage } from "@/lib/api";
-import { login as loginRequest, logout as logoutRequest } from "@/services/authService";
+import { login as loginRequest, logout as logoutRequest } from "../api/authService";
 import type { User } from "@/lib/types";
 
 interface AuthContextValue {

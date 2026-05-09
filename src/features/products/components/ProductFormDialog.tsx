@@ -20,9 +20,9 @@ import {
   createProduct,
   updateProduct,
   uploadProductImage,
-} from "@/services/productService";
-import { productSchema } from "@/schemas/productSchema";
-import type { ProductFormValues } from "@/schemas/productSchema";
+} from "../api/productService";
+import { productSchema } from "../schemas/productSchema";
+import type { ProductFormValues } from "../schemas/productSchema";
 import type { Product } from "@/lib/types";
 
 interface Props {

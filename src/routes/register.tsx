@@ -2,15 +2,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute, useNavigate, Navigate, Link } from "@tanstack/react-router";
 import { Package } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
-import { register as registerRequest } from "@/services/authService";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { register as registerRequest } from "@/features/auth/api/authService";
 import { extractErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { registerSchema } from "@/schemas/registerSchema";
-import type { RegisterFormValues } from "@/schemas/registerSchema";
+import { registerSchema } from "@/features/auth/schemas/registerSchema";
+import type { RegisterFormValues } from "@/features/auth/schemas/registerSchema";
 
 export const Route = createFileRoute("/register")({
   head: () => ({

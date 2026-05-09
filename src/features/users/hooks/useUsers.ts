@@ -5,7 +5,7 @@ import {
   listUsers,
   updateUser,
   updateUserRole,
-} from "@/services/userService";
+} from "../api/userService";
 import type { Role } from "@/lib/types";
 
 export function useUsers(page: number) {

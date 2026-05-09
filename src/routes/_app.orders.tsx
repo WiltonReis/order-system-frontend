@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { OrderFilters } from "@/services/orderService";
+import type { OrderFilters } from "@/features/orders/api/orderService";
 import { extractErrorMessage } from "@/lib/api";
 import type { Order } from "@/lib/types";
 import { brl, dateTime } from "@/lib/format";
-import { useAuth } from "@/context/AuthContext";
-import { OrderFormDialog } from "@/components/orders/OrderFormDialog";
-import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
-import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
-import { OrderFilterBar } from "@/components/orders/OrderFilterBar";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { OrderFormDialog } from "@/features/orders/components/OrderFormDialog";
+import { OrderDetailsDialog } from "@/features/orders/components/OrderDetailsDialog";
+import { OrderStatusBadge } from "@/features/orders/components/OrderStatusBadge";
+import { OrderFilterBar } from "@/features/orders/components/OrderFilterBar";
 import {
   useActiveOrders,
   useCancelOrder,
@@ -23,7 +23,7 @@ import {
   useFinalizeOrder,
   useHistoryOrders,
   useRestoreOrder,
-} from "@/hooks/queries/useOrders";
+} from "@/features/orders/hooks/useOrders";
 import { DataTable } from "@/shared/components/DataTable";
 import type { TableColumn } from "@/shared/components/DataTable";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";

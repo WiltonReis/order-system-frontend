@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 
 export function Hero() {
   const { isAuthenticated } = useAuth();

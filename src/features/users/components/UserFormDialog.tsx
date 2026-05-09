@@ -21,9 +21,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { extractErrorMessage } from "@/lib/api";
-import { useCreateUser, useUpdateUser } from "@/hooks/queries/useUsers";
-import { editUserSchema } from "@/schemas/userSchema";
-import type { EditUserFormValues } from "@/schemas/userSchema";
+import { useCreateUser, useUpdateUser } from "../hooks/useUsers";
+import { editUserSchema } from "../schemas/userSchema";
+import type { EditUserFormValues } from "../schemas/userSchema";
 import type { User } from "@/lib/types";
 
 interface Props {

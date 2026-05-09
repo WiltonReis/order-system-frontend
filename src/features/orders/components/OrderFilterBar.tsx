@@ -12,8 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { listUsers } from "@/services/userService";
-import type { OrderFilters } from "@/services/orderService";
+import { listUsers } from "@/features/users/api/userService";
+import type { OrderFilters } from "../api/orderService";
 import type { OrderStatus, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 

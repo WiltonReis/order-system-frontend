@@ -11,8 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { brl, dateTime } from "@/lib/format";
 import type { Order } from "@/lib/types";
-import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
-import { useOrderStatusHistory } from "@/hooks/queries/useOrders";
+import { OrderStatusBadge } from "./OrderStatusBadge";
+import { useOrderStatusHistory } from "../hooks/useOrders";
 
 interface Props {
   open: boolean;

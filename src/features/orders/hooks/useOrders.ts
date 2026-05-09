@@ -6,8 +6,8 @@ import {
   listOrders,
   listOrderStatusHistory,
   restoreOrder,
-} from "@/services/orderService";
-import type { OrderFilters } from "@/services/orderService";
+} from "../api/orderService";
+import type { OrderFilters } from "../api/orderService";
 import type { OrderStatus } from "@/lib/types";
 
 export function useActiveOrders(page: number, filters: OrderFilters) {

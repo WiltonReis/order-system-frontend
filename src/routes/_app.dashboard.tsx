@@ -12,9 +12,9 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
-import { useAuth } from "@/context/AuthContext";
-import { type DashboardPeriod } from "@/services/dashboardService";
-import { useDashboard } from "@/hooks/queries/useDashboard";
+import { useAuth } from "@/features/auth/context/AuthContext";
+import { type DashboardPeriod } from "@/features/dashboard/api/dashboardService";
+import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {

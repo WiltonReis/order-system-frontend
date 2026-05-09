@@ -25,4 +25,22 @@ export default tseslint.config(
     },
   },
   eslintPluginPrettier,
+  {
+    files: ["src/features/orders/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        { patterns: [{ group: ["@/features/products/*"], message: "Cross-feature import: orders → products. Route through shared/ or pass as prop." }] },
+      ],
+    },
+  },
+  {
+    files: ["src/features/products/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        { patterns: [{ group: ["@/features/orders/*"], message: "Cross-feature import: products → orders. Route through shared/ or pass as prop." }] },
+      ],
+    },
+  },
 );

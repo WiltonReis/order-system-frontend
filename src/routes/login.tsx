@@ -2,12 +2,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute, useNavigate, Navigate, Link } from "@tanstack/react-router";
 import { Package } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { loginSchema } from "@/schemas/loginSchema";
-import type { LoginFormValues } from "@/schemas/loginSchema";
+import { loginSchema } from "@/features/auth/schemas/loginSchema";
+import type { LoginFormValues } from "@/features/auth/schemas/loginSchema";
 
 export const Route = createFileRoute("/login")({
   head: () => ({

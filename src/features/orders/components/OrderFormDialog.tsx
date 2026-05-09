@@ -19,10 +19,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { brl } from "@/lib/format";
-import { listProducts } from "@/services/productService";
-import { createOrder, updateOrder } from "@/services/orderService";
+import { listProducts } from "@/features/products/api/productService";
+import { createOrder, updateOrder } from "../api/orderService";
 import type { Order, Product } from "@/lib/types";
-import { useAuth } from "@/context/AuthContext";
+import { useAuth } from "@/features/auth/context/AuthContext";
 import { extractErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
 
