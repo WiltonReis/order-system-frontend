@@ -191,3 +191,11 @@ export async function finalizeOrder(id: string): Promise<void> {
 export async function cancelOrder(id: string): Promise<void> {
   await api.put(`/orders/${id}/cancel`);
 }
+
+export async function deleteOrder(id: string): Promise<void> {
+  await api.delete(`/orders/${id}`);
+}
+
+export async function restoreOrder(id: string): Promise<void> {
+  await api.post(`/orders/${id}/restore`);
+}

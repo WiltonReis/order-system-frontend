@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Eye, Pencil, Plus, ShoppingCart, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, Pencil, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,14 @@ import { OrderFormDialog } from "@/components/orders/OrderFormDialog";
 import { OrderDetailsDialog } from "@/components/orders/OrderDetailsDialog";
 import { OrderStatusBadge } from "@/components/orders/OrderStatusBadge";
 import { OrderFilterBar } from "@/components/orders/OrderFilterBar";
-import { useActiveOrders, useCancelOrder, useFinalizeOrder, useHistoryOrders } from "@/hooks/queries/useOrders";
+import {
+  useActiveOrders,
+  useCancelOrder,
+  useDeleteOrder,
+  useFinalizeOrder,
+  useHistoryOrders,
+  useRestoreOrder,
+} from "@/hooks/queries/useOrders";
 import { DataTable } from "@/shared/components/DataTable";
 import type { TableColumn } from "@/shared/components/DataTable";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
@@ -29,11 +36,12 @@ export const Route = createFileRoute("/_app/orders")({
   component: OrdersPage,
 });
 
-type ConfirmAction = { type: "finalize" | "cancel"; order: Order };
+type ConfirmAction = { type: "finalize" | "cancel" | "delete"; order: Order };
 
 function OrdersPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const isAdmin = user?.role === "ADMIN" || user?.role === "ADMIN_MASTER";
 
   const activePag = usePagination();
   const historyPag = usePagination();
@@ -47,6 +55,8 @@ function OrdersPage() {
   const historyQuery = useHistoryOrders(historyPag.page, filters);
   const finalizeMutation = useFinalizeOrder();
   const cancelMutation = useCancelOrder();
+  const deleteMutation = useDeleteOrder();
+  const restoreMutation = useRestoreOrder();
 
   const activeOrders = activeQuery.data?.content ?? [];
   const historyOrders = historyQuery.data?.content ?? [];
@@ -84,9 +94,25 @@ function OrdersPage() {
       if (type === "finalize") {
         await finalizeMutation.mutateAsync(order.id);
         toast.success("Pedido finalizado");
-      } else {
+      } else if (type === "cancel") {
         await cancelMutation.mutateAsync(order.id);
         toast.success("Pedido cancelado");
+      } else {
+        await deleteMutation.mutateAsync(order.id);
+        toast(`Pedido #${order.orderCode} excluído.`, {
+          duration: 5000,
+          action: {
+            label: "Desfazer",
+            onClick: async () => {
+              try {
+                await restoreMutation.mutateAsync(order.id);
+                toast.success("Pedido restaurado");
+              } catch (err) {
+                toast.error(extractErrorMessage(err, "Não foi possível desfazer"));
+              }
+            },
+          },
+        });
       }
     } catch (e) {
       toast.error(extractErrorMessage(e, "Erro ao atualizar pedido"));
@@ -126,7 +152,7 @@ function OrdersPage() {
     },
     {
       header: <span className="block text-right">Ações</span>,
-      className: "w-[152px]",
+      className: isAdmin ? "w-[200px]" : "w-[152px]",
       cell: (o) => (
         <div className="flex justify-end gap-1">
           <Tooltip>
@@ -161,6 +187,16 @@ function OrdersPage() {
             </TooltipTrigger>
             <TooltipContent>Cancelar pedido</TooltipContent>
           </Tooltip>
+          {isAdmin && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" aria-label="Excluir pedido" onClick={() => setConfirmAction({ type: "delete", order: o })}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Excluir pedido</TooltipContent>
+            </Tooltip>
+          )}
         </div>
       ),
     },
@@ -219,11 +255,18 @@ function OrdersPage() {
     },
   ];
 
-  const confirmTitle = confirmAction?.type === "finalize" ? "Finalizar pedido?" : "Cancelar pedido?";
+  const confirmTitle =
+    confirmAction?.type === "finalize"
+      ? "Finalizar pedido?"
+      : confirmAction?.type === "delete"
+        ? "Excluir pedido?"
+        : "Cancelar pedido?";
   const confirmDescription =
     confirmAction?.type === "finalize"
       ? "O pedido será marcado como finalizado e não poderá mais ser editado."
-      : "O pedido será cancelado. Essa ação não pode ser desfeita.";
+      : confirmAction?.type === "delete"
+        ? "O pedido será excluído. Você terá alguns segundos para desfazer."
+        : "O pedido será cancelado. Essa ação não pode ser desfeita.";
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -290,7 +333,7 @@ function OrdersPage() {
           description={confirmDescription}
           onConfirm={executeAction}
           confirmLabel="Confirmar"
-          destructive={confirmAction?.type === "cancel"}
+          destructive={confirmAction?.type === "cancel" || confirmAction?.type === "delete"}
         />
 
         {user && (

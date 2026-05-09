@@ -1,5 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { cancelOrder, finalizeOrder, listOrders } from "@/services/orderService";
+import {
+  cancelOrder,
+  deleteOrder,
+  finalizeOrder,
+  listOrders,
+  restoreOrder,
+} from "@/services/orderService";
 import type { OrderFilters } from "@/services/orderService";
 import type { OrderStatus } from "@/lib/types";
 
@@ -35,6 +41,22 @@ export function useCancelOrder() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: cancelOrder,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+  });
+}
+
+export function useDeleteOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: deleteOrder,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+  });
+}
+
+export function useRestoreOrder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: restoreOrder,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
   });
 }
