@@ -13,6 +13,9 @@ import { brl, dateTime } from "@/lib/format";
 import type { Order } from "@/lib/types";
 import { OrderStatusBadge } from "./OrderStatusBadge";
 import { useOrderStatusHistory } from "../hooks/useOrders";
+import { useState } from "react";
+import { exportOrderPdf } from "../api/orderService";
+import { toast } from "sonner";
 
 interface Props {
   open: boolean;
@@ -22,12 +25,26 @@ interface Props {
 
 export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
   const historyQuery = useOrderStatusHistory(open ? order?.id : null);
+  const [exporting, setExporting] = useState(false);
 
   if (!order) return null;
 
   const subtotal = order.items.reduce((acc, it) => acc + it.subtotal, 0);
   // O backend sempre armazena e retorna o desconto como valor absoluto
   const discountValue = order.discountAmount;
+
+  async function handleExportPdf() {
+    if (!order) return;
+    setExporting(true);
+    try {
+      const filename = `pedido-${order.orderCode || order.id}.pdf`;
+      await exportOrderPdf(order.id, filename);
+    } catch {
+      toast.error("Erro ao exportar PDF. Tente novamente.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -164,6 +181,9 @@ export function OrderDetailsDialog({ open, onOpenChange, order }: Props) {
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Fechar
+          </Button>
+          <Button onClick={handleExportPdf} disabled={exporting}>
+            {exporting ? "Exportando…" : "Exportar PDF"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -212,3 +212,15 @@ export async function listOrderStatusHistory(orderId: string): Promise<OrderStat
   const { data } = await api.get<OrderStatusHistoryEntry[]>(`/orders/${orderId}/status-history`);
   return data;
 }
+
+export async function exportOrderPdf(id: string, filename: string): Promise<void> {
+  const response = await api.get(`/orders/${id}/pdf`, { responseType: "blob" });
+  const url = URL.createObjectURL(response.data as Blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
