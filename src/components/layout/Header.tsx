@@ -2,6 +2,7 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { LayoutDashboard, LogOut, Package, ShoppingCart, Users } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/shared/components/ThemeToggle";
 import type { Role } from "@/lib/types";
 
 interface NavItem {
@@ -75,6 +76,7 @@ export function Header() {
               </span>
             )}
           </span>
+          <ThemeToggle />
           <Button variant="outline" size="sm" onClick={handleLogout}>
             <LogOut className="mr-2 h-4 w-4" />
             Sair
