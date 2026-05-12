@@ -3,6 +3,7 @@ import { useAuth } from "@/features/auth/context/AuthContext";
 import { Header } from "@/shared/components/layout/Header";
 import { Hero } from "@/features/landing/components/Hero";
 import { Features } from "@/features/landing/components/Features";
+import { TechStack } from "@/features/landing/components/TechStack";
 import { Footer } from "@/features/landing/components/Footer";
 
 export const Route = createFileRoute("/")({
@@ -20,6 +21,7 @@ function LandingPage() {
       {isAuthenticated && <Header />}
       <Hero />
       <Features />
+      <TechStack />
       <Footer />
     </div>
   );

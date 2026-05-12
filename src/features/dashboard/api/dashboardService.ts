@@ -3,8 +3,23 @@ import type { DashboardData } from "@/lib/types";
 
 export type DashboardPeriod = "TODAY" | "WEEK" | "MONTH" | "ALL";
 
-export async function getDashboard(period: DashboardPeriod): Promise<DashboardData> {
-  const { data } = await api.get<DashboardData>(`/dashboard?period=${period}`);
+export interface DashboardParams {
+  period?: DashboardPeriod;
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string;   // YYYY-MM-DD
+}
+
+export async function getDashboard(params: DashboardParams): Promise<DashboardData> {
+  const query = new URLSearchParams();
+
+  if (params.startDate && params.endDate) {
+    query.set("startDate", params.startDate);
+    query.set("endDate", params.endDate);
+  } else {
+    query.set("period", params.period ?? "ALL");
+  }
+
+  const { data } = await api.get<DashboardData>(`/dashboard?${query}`);
   return {
     ...data,
     revenue: Number(data.revenue),

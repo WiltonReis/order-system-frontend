@@ -1,4 +1,4 @@
-import { BarChart2, Package, ShoppingCart, Users } from "lucide-react";
+import { BarChart2, Clock, FileText, Package, ShoppingCart, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 interface Feature {
@@ -11,7 +11,7 @@ const FEATURES: Feature[] = [
   {
     icon: ShoppingCart,
     title: "Pedidos em Tempo Real",
-    description: "Crie, edite e finalize pedidos com rastreamento de status instantâneo.",
+    description: "Crie, edite e finalize pedidos com rastreamento de status instantâneo e exclusão reversível.",
   },
   {
     icon: Package,
@@ -20,13 +20,23 @@ const FEATURES: Feature[] = [
   },
   {
     icon: BarChart2,
-    title: "Métricas e Relatórios",
-    description: "Dashboard com receita, ticket médio e top produtos do período.",
+    title: "Métricas e Dashboard",
+    description: "Gráficos de receita, ticket médio e distribuição de pedidos por status do período.",
   },
   {
     icon: Users,
     title: "Controle de Acesso",
-    description: "Defina permissões por usuário com papéis ADMIN e USER.",
+    description: "Defina permissões por usuário com papéis ADMIN e USER dentro da sua empresa.",
+  },
+  {
+    icon: FileText,
+    title: "Exportação em PDF",
+    description: "Gere relatórios completos de pedidos em PDF com itens, desconto, totais e auditoria.",
+  },
+  {
+    icon: Clock,
+    title: "Histórico de Status",
+    description: "Toda transição de status é registrada com autor e timestamp — rastreabilidade completa.",
   },
 ];
 
@@ -34,10 +44,13 @@ export function Features() {
   return (
     <section className="px-4 py-20">
       <div className="mx-auto max-w-5xl">
-        <h2 className="mb-12 text-center text-2xl font-semibold tracking-tight sm:text-3xl">
+        <h2 className="mb-3 text-center text-2xl font-semibold tracking-tight sm:text-3xl">
           Tudo que você precisa para operar
         </h2>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <p className="mb-12 text-center text-sm text-muted-foreground">
+          Funcionalidades implementadas e documentadas — cada uma demonstrando práticas de mercado.
+        </p>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => {
             const Icon = f.icon;
             return (

@@ -26,7 +26,7 @@ export function Header() {
 
   const handleLogout = () => {
     logout();
-    navigate({ to: "/login" });
+    navigate({ to: "/" });
   };
 
   const visibleItems = NAV_ITEMS.filter((i) => user && i.roles.includes(user.role));

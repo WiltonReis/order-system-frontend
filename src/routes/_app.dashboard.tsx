@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createFileRoute, Navigate } from "@tanstack/react-router";
 import {
   AreaChart,
@@ -12,6 +12,8 @@ import {
   YAxis,
   CartesianGrid,
 } from "recharts";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
+import { CalendarDays, X } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { type DashboardPeriod } from "@/features/dashboard/api/dashboardService";
 import { useDashboard } from "@/features/dashboard/hooks/useDashboard";
@@ -24,6 +26,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { brl } from "@/lib/format";
 
 export const Route = createFileRoute("/_app/dashboard")({
@@ -77,6 +80,11 @@ function formatDateLabel(dateStr: string): string {
   return `${day}/${month}`;
 }
 
+function formatDateDisplay(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-");
+  return `${day}/${month}/${year}`;
+}
+
 function MetricCardSkeleton() {
   return (
     <Card>
@@ -96,12 +104,153 @@ function ChartSkeleton({ height = 240 }: { height?: number }) {
   );
 }
 
+interface DateRangePickerProps {
+  value: { start: string; end: string } | null;
+  onApply: (start: string, end: string) => void;
+  onClear: () => void;
+}
+
+function DateRangePicker({ value, onApply, onClear }: DateRangePickerProps) {
+  const today = new Date().toISOString().split("T")[0];
+  const [start, setStart] = useState(value?.start ?? "");
+  const [end, setEnd] = useState(value?.end ?? "");
+  const [open, setOpen] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  const handleOpen = (next: boolean) => {
+    if (next) {
+      setStart(value?.start ?? "");
+      setEnd(value?.end ?? "");
+    }
+    setOpen(next);
+  };
+
+  const handleApply = () => {
+    if (start && end && start <= end) {
+      onApply(start, end);
+      setOpen(false);
+    }
+  };
+
+  const isActive = value !== null;
+  const canApply = start && end && start <= end;
+
+  return (
+    <Popover open={open} onOpenChange={handleOpen}>
+      <PopoverTrigger asChild>
+        <button
+          aria-label="Filtrar por período personalizado"
+          className={`flex h-9 w-9 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            isActive
+              ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+              : "border-border bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground"
+          }`}
+        >
+          <CalendarDays className="h-4 w-4" />
+        </button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="start"
+        sideOffset={8}
+        className="w-72 p-0 shadow-lg"
+      >
+        {/* Arrow pointing up toward trigger */}
+        <PopoverPrimitive.Arrow
+          width={12}
+          height={6}
+          className="fill-border"
+          style={{ fill: "hsl(var(--border))" }}
+        />
+
+        <div className="p-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold">Período personalizado</p>
+            <button
+              ref={closeRef}
+              onClick={() => setOpen(false)}
+              className="rounded p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+              aria-label="Fechar"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                De
+              </label>
+              <input
+                type="date"
+                value={start}
+                max={end || today}
+                onChange={(e) => setStart(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [color-scheme:light] dark:[color-scheme:dark]"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Até
+              </label>
+              <input
+                type="date"
+                value={end}
+                min={start || undefined}
+                max={today}
+                onChange={(e) => setEnd(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground transition-colors focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary [color-scheme:light] dark:[color-scheme:dark]"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            {isActive && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => {
+                  onClear();
+                  setOpen(false);
+                }}
+              >
+                Limpar
+              </Button>
+            )}
+            <Button
+              size="sm"
+              className="flex-1"
+              disabled={!canApply}
+              onClick={handleApply}
+            >
+              Aplicar
+            </Button>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 function DashboardPage() {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" />;
 
   const [period, setPeriod] = useState<DashboardPeriod>("ALL");
-  const { data, isPending } = useDashboard(period);
+  const [customRange, setCustomRange] = useState<{ start: string; end: string } | null>(null);
+
+  const dashboardParams = customRange
+    ? { startDate: customRange.start, endDate: customRange.end }
+    : { period };
+
+  const { data, isPending } = useDashboard(dashboardParams);
+
+  const handlePeriodChange = (p: DashboardPeriod) => {
+    setCustomRange(null);
+    setPeriod(p);
+  };
 
   const statusData = data
     ? [
@@ -114,25 +263,49 @@ function DashboardPage() {
   const hasStatusData = statusData.length > 0;
   const hasRevenueData = (data?.revenueByDay.length ?? 0) > 0;
 
+  const periodLabel = customRange
+    ? `${formatDateDisplay(customRange.start)} — ${formatDateDisplay(customRange.end)}`
+    : null;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Visão geral e métricas do sistema.</p>
+          <p className="text-sm text-muted-foreground">
+            {periodLabel ? (
+              <>
+                Período:{" "}
+                <span className="font-medium text-foreground">{periodLabel}</span>
+              </>
+            ) : (
+              "Visão geral e métricas do sistema."
+            )}
+          </p>
         </div>
-        <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">
-          {PERIODS.map((p) => (
-            <Button
-              key={p.value}
-              size="sm"
-              variant={period === p.value ? "default" : "ghost"}
-              className="h-7 px-3 text-xs"
-              onClick={() => setPeriod(p.value)}
-            >
-              {p.label}
-            </Button>
-          ))}
+
+        <div className="flex items-center gap-2">
+          {/* Preset periods */}
+          <div className="flex gap-1 rounded-lg border border-border bg-muted/40 p-1">
+            {PERIODS.map((p) => (
+              <Button
+                key={p.value}
+                size="sm"
+                variant={!customRange && period === p.value ? "default" : "ghost"}
+                className="h-7 px-3 text-xs"
+                onClick={() => handlePeriodChange(p.value)}
+              >
+                {p.label}
+              </Button>
+            ))}
+          </div>
+
+          {/* Custom date range picker */}
+          <DateRangePicker
+            value={customRange}
+            onApply={(start, end) => setCustomRange({ start, end })}
+            onClear={() => setCustomRange(null)}
+          />
         </div>
       </div>
 
@@ -154,7 +327,7 @@ function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{data.totalOrders}</p>
+                <p className="text-2xl font-bold dark:text-violet-400">{data.totalOrders}</p>
               </CardContent>
             </Card>
 
@@ -165,7 +338,7 @@ function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{brl(data.revenue)}</p>
+                <p className="text-2xl font-bold dark:text-violet-400">{brl(data.revenue)}</p>
               </CardContent>
             </Card>
 
@@ -176,7 +349,7 @@ function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{data.cancelRate.toFixed(1)}%</p>
+                <p className="text-2xl font-bold dark:text-violet-400">{data.cancelRate.toFixed(1)}%</p>
               </CardContent>
             </Card>
 
@@ -187,7 +360,7 @@ function DashboardPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{brl(data.averageTicket)}</p>
+                <p className="text-2xl font-bold dark:text-violet-400">{brl(data.averageTicket)}</p>
               </CardContent>
             </Card>
           </>
@@ -282,7 +455,7 @@ function DashboardPage() {
                     axisLine={false}
                   />
                   <YAxis
-                    tickFormatter={(v: number) => brl(v).replace("R$ ", "R$ ")}
+                    tickFormatter={(v: number) => brl(v).replace("R$ ", "R$ ")}
                     tick={{ fontSize: 11 }}
                     tickLine={false}
                     axisLine={false}

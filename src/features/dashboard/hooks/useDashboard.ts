@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { getDashboard, type DashboardPeriod } from "../api/dashboardService";
+import { getDashboard, type DashboardParams } from "../api/dashboardService";
 
-export function useDashboard(period: DashboardPeriod) {
+export function useDashboard(params: DashboardParams) {
   return useQuery({
-    queryKey: ["dashboard", period],
-    queryFn: () => getDashboard(period),
+    queryKey: ["dashboard", params],
+    queryFn: () => getDashboard(params),
   });
 }
