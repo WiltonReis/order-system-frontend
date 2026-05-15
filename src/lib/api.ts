@@ -38,11 +38,9 @@ function drainQueue(error: unknown) {
   pendingQueue = [];
 }
 
-function redirectToLogin() {
+function signalSessionExpired() {
   userStorage.clear();
-  if (window.location.pathname !== "/login") {
-    window.location.href = "/login";
-  }
+  window.dispatchEvent(new CustomEvent("oms:auth-expired"));
 }
 
 // Interceptor de resposta: ao receber 401, tenta renovar o access token via
@@ -95,15 +93,12 @@ export function resolveImageUrl(url: string | null | undefined): string | null {
   return url;
 }
 
-/**
- * Extrai a mensagem de erro do backend a partir de erros Axios ou genéricos.
- * O backend retorna { message, status } no corpo dos erros.
- */
 export function extractErrorMessage(e: unknown, fallback = "Erro inesperado"): string {
   if (axios.isAxiosError(e)) {
-    const msg = (e.response?.data as { message?: string } | undefined)?.message;
+    const data = e.response?.data as { detail?: string; message?: string } | undefined;
+    const msg = data?.detail ?? data?.message;
     if (msg) return msg;
-    return e.message;
+    return fallback;
   }
   if (e instanceof Error) return e.message;
   return fallback;

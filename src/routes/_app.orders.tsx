@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Eye, Pencil, Plus, ShoppingCart, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Eye, Pencil, Plus, ShoppingCart, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import type { OrderFilters } from "@/features/orders/api/orderService";
+import { cancelOrder, type OrderFilters } from "@/features/orders/api/orderService";
 import { extractErrorMessage } from "@/lib/api";
 import type { Order } from "@/lib/types";
 import { brl, dateTime } from "@/lib/format";
@@ -18,15 +18,13 @@ import { OrderStatusBadge } from "@/features/orders/components/OrderStatusBadge"
 import { OrderFilterBar } from "@/features/orders/components/OrderFilterBar";
 import {
   useActiveOrders,
-  useCancelOrder,
-  useDeleteOrder,
   useFinalizeOrder,
   useHistoryOrders,
-  useRestoreOrder,
 } from "@/features/orders/hooks/useOrders";
 import { DataTable } from "@/shared/components/DataTable";
 import type { TableColumn } from "@/shared/components/DataTable";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
+import { showUndoToast } from "@/shared/components/UndoToast";
 import { usePagination } from "@/shared/hooks/usePagination";
 
 export const Route = createFileRoute("/_app/orders")({
@@ -36,12 +34,11 @@ export const Route = createFileRoute("/_app/orders")({
   component: OrdersPage,
 });
 
-type ConfirmAction = { type: "finalize" | "cancel" | "delete"; order: Order };
+type ConfirmAction = { type: "finalize"; order: Order } | { type: "cancel"; order: Order };
 
 function OrdersPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const isAdmin = user?.role === "ADMIN" || user?.role === "ADMIN_MASTER";
 
   const activePag = usePagination();
   const historyPag = usePagination();
@@ -54,11 +51,10 @@ function OrdersPage() {
   const activeQuery = useActiveOrders(activePag.page, filters);
   const historyQuery = useHistoryOrders(historyPag.page, filters);
   const finalizeMutation = useFinalizeOrder();
-  const cancelMutation = useCancelOrder();
-  const deleteMutation = useDeleteOrder();
-  const restoreMutation = useRestoreOrder();
+  const [pendingCancelIds, setPendingCancelIds] = useState<Set<string>>(new Set());
 
-  const activeOrders = activeQuery.data?.content ?? [];
+  const allActiveOrders = activeQuery.data?.content ?? [];
+  const activeOrders = allActiveOrders.filter((o) => !pendingCancelIds.has(o.id));
   const historyOrders = historyQuery.data?.content ?? [];
   const activeTotalPages = activeQuery.data?.totalPages ?? 0;
   const historyTotalPages = historyQuery.data?.totalPages ?? 0;
@@ -90,33 +86,44 @@ function OrdersPage() {
     if (!confirmAction) return;
     const { type, order } = confirmAction;
     setConfirmAction(null);
-    try {
-      if (type === "finalize") {
+    if (type === "finalize") {
+      try {
         await finalizeMutation.mutateAsync(order.id);
         toast.success("Pedido finalizado");
-      } else if (type === "cancel") {
-        await cancelMutation.mutateAsync(order.id);
-        toast.success("Pedido cancelado");
-      } else {
-        await deleteMutation.mutateAsync(order.id);
-        toast(`Pedido #${order.orderCode} excluído.`, {
-          duration: 5000,
-          action: {
-            label: "Desfazer",
-            onClick: async () => {
-              try {
-                await restoreMutation.mutateAsync(order.id);
-                toast.success("Pedido restaurado");
-              } catch (err) {
-                toast.error(extractErrorMessage(err, "Não foi possível desfazer"));
-              }
-            },
-          },
-        });
+      } catch (e) {
+        toast.error(extractErrorMessage(e, "Erro ao atualizar pedido"));
       }
-    } catch (e) {
-      toast.error(extractErrorMessage(e, "Erro ao atualizar pedido"));
+    } else {
+      setPendingCancelIds((prev) => new Set([...prev, order.id]));
+      showUndoToast(
+        `Pedido #${order.orderCode} cancelado`,
+        async () => {
+          try {
+            await cancelOrder(order.id);
+            await queryClient.invalidateQueries({ queryKey: ["orders"] });
+          } catch (e) {
+            toast.error(extractErrorMessage(e, "Erro ao cancelar pedido"));
+            await queryClient.invalidateQueries({ queryKey: ["orders"] });
+          }
+          setPendingCancelIds((prev) => {
+            const next = new Set(prev);
+            next.delete(order.id);
+            return next;
+          });
+        },
+        () => {
+          setPendingCancelIds((prev) => {
+            const next = new Set(prev);
+            next.delete(order.id);
+            return next;
+          });
+        },
+      );
     }
+  };
+
+  const handleCancel = (order: Order) => {
+    setConfirmAction({ type: "cancel", order });
   };
 
   const activeColumns: TableColumn<Order>[] = [
@@ -152,7 +159,7 @@ function OrdersPage() {
     },
     {
       header: <span className="block text-right">Ações</span>,
-      className: isAdmin ? "w-[200px]" : "w-[152px]",
+      className: "w-[152px]",
       cell: (o) => (
         <div className="flex justify-end gap-1">
           <Tooltip>
@@ -181,22 +188,12 @@ function OrdersPage() {
           </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" aria-label="Cancelar pedido" onClick={() => setConfirmAction({ type: "cancel", order: o })}>
+              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" aria-label="Cancelar pedido" onClick={() => handleCancel(o)}>
                 <XCircle className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Cancelar pedido</TooltipContent>
           </Tooltip>
-          {isAdmin && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" aria-label="Excluir pedido" onClick={() => setConfirmAction({ type: "delete", order: o })}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Excluir pedido</TooltipContent>
-            </Tooltip>
-          )}
         </div>
       ),
     },
@@ -255,18 +252,12 @@ function OrdersPage() {
     },
   ];
 
-  const confirmTitle =
-    confirmAction?.type === "finalize"
-      ? "Finalizar pedido?"
-      : confirmAction?.type === "delete"
-        ? "Excluir pedido?"
-        : "Cancelar pedido?";
+  const confirmTitle = confirmAction?.type === "cancel" ? "Cancelar pedido?" : "Finalizar pedido?";
   const confirmDescription =
-    confirmAction?.type === "finalize"
-      ? "O pedido será marcado como finalizado e não poderá mais ser editado."
-      : confirmAction?.type === "delete"
-        ? "O pedido será excluído. Você terá alguns segundos para desfazer."
-        : "O pedido será cancelado. Essa ação não pode ser desfeita.";
+    confirmAction?.type === "cancel"
+      ? "O pedido será cancelado. Esta ação poderá ser desfeita por alguns segundos."
+      : "O pedido será marcado como finalizado e não poderá mais ser editado.";
+  const confirmLabel = confirmAction?.type === "cancel" ? "Cancelar pedido" : "Finalizar";
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -332,8 +323,8 @@ function OrdersPage() {
           title={confirmTitle}
           description={confirmDescription}
           onConfirm={executeAction}
-          confirmLabel="Confirmar"
-          destructive={confirmAction?.type === "cancel" || confirmAction?.type === "delete"}
+          confirmLabel={confirmLabel}
+          destructive={confirmAction?.type === "cancel"}
         />
 
         {user && (

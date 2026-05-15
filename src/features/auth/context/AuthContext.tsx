@@ -1,4 +1,6 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { userStorage } from "@/lib/api";
 import { login as loginRequest, logout as logoutRequest } from "../api/authService";
 import type { User } from "@/lib/types";
@@ -16,6 +18,8 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const sessionExpiredRef = useRef(false);
 
   useEffect(() => {
     // Restaura dados de display do usuário do localStorage.
@@ -28,7 +32,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
+  useEffect(() => {
+    const handler = () => {
+      // useRef evita double-fire em React StrictMode
+      if (sessionExpiredRef.current) return;
+      sessionExpiredRef.current = true;
+      userStorage.clear();
+      setUser(null);
+      queryClient.clear();
+      toast.error("Sessão expirada", {
+        description: "Faça login novamente para continuar.",
+      });
+    };
+    window.addEventListener("oms:auth-expired", handler);
+    return () => window.removeEventListener("oms:auth-expired", handler);
+  }, [queryClient]);
+
   const login = async (email: string, password: string) => {
+    sessionExpiredRef.current = false;
     const { user } = await loginRequest(email, password);
     userStorage.set(user);
     setUser(user);
@@ -38,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Limpa estado local imediatamente e sinaliza ao backend para expirar o cookie
     userStorage.clear();
     setUser(null);
+    queryClient.clear();
     logoutRequest().catch(() => {});
   };
 

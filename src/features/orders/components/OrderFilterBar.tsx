@@ -109,7 +109,7 @@ export function OrderFilterBar({ onApply }: Props) {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="start" sideOffset={10} className="w-72 p-0">
+      <PopoverContent align="end" sideOffset={10} className="w-72 p-0">
         <PopoverPrimitive.Arrow className="fill-border" width={14} height={7} />
 
         <div className="space-y-4 p-4">

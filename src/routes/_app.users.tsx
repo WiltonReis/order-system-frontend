@@ -15,10 +15,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useAuth } from "@/features/auth/context/AuthContext";
 import type { Role, User } from "@/lib/types";
 import { toast } from "sonner";
-import { useUsers, useUpdateUserRole, useDeleteUser } from "@/features/users/hooks/useUsers";
+import { useQueryClient } from "@tanstack/react-query";
+import { useUsers, useUpdateUserRole } from "@/features/users/hooks/useUsers";
+import { deleteUser } from "@/features/users/api/userService";
 import { usePagination } from "@/shared/hooks/usePagination";
 import { DataTable } from "@/shared/components/DataTable";
 import type { TableColumn } from "@/shared/components/DataTable";
+import { showUndoToast } from "@/shared/components/UndoToast";
 import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { UserFormDialog } from "@/features/users/components/UserFormDialog";
 
@@ -36,13 +39,15 @@ function UsersPage() {
   const { page, prev, next } = usePagination();
   const [formOpen, setFormOpen] = useState(false);
   const [formUser, setFormUser] = useState<User | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState<User | null>(null);
+  const queryClient = useQueryClient();
 
   const { data, isPending } = useUsers(page);
   const updateRoleMutation = useUpdateUserRole();
-  const deleteMutation = useDeleteUser();
 
-  const users = data?.content ?? [];
+  const allUsers = data?.content ?? [];
+  const users = allUsers.filter((u) => !pendingIds.has(u.id));
   const totalPages = data?.totalPages ?? 0;
 
   if (user && user.role !== "ADMIN" && user.role !== "ADMIN_MASTER") return <Navigate to="/orders" />;
@@ -66,15 +71,39 @@ function UsersPage() {
     setFormOpen(true);
   };
 
-  const executeDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await deleteMutation.mutateAsync(deleteTarget.id);
-      toast.success("Usuário excluído");
-      setDeleteTarget(null);
-    } catch (e) {
-      toast.error(extractErrorMessage(e, "Erro ao excluir usuário"));
-    }
+  const handleDelete = (u: User) => {
+    setConfirmDeleteUser(u);
+  };
+
+  const executeDelete = () => {
+    const u = confirmDeleteUser;
+    if (!u) return;
+    setConfirmDeleteUser(null);
+    setPendingIds((prev) => new Set([...prev, u.id]));
+    showUndoToast(
+      `Usuário "${u.name}" excluído`,
+      async () => {
+        try {
+          await deleteUser(u.id);
+          await queryClient.invalidateQueries({ queryKey: ["users"] });
+        } catch (e) {
+          toast.error(extractErrorMessage(e, "Erro ao excluir usuário"));
+          await queryClient.invalidateQueries({ queryKey: ["users"] });
+        }
+        setPendingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(u.id);
+          return next;
+        });
+      },
+      () => {
+        setPendingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(u.id);
+          return next;
+        });
+      },
+    );
   };
 
   const columns: TableColumn<User>[] = [
@@ -151,7 +180,7 @@ function UsersPage() {
                     variant="ghost"
                     className="h-8 w-8 text-muted-foreground hover:text-destructive"
                     aria-label={isMaster ? "Não é possível modificar o administrador master" : "Excluir usuário"}
-                    onClick={() => setDeleteTarget(u)}
+                    onClick={() => handleDelete(u)}
                     disabled={isSelf || isMaster}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -194,20 +223,20 @@ function UsersPage() {
           pagination={{ page, total: totalPages, onPrev: prev, onNext: next }}
         />
 
+        <ConfirmDialog
+          open={!!confirmDeleteUser}
+          onOpenChange={(o) => !o && setConfirmDeleteUser(null)}
+          title="Excluir usuário?"
+          description={`O usuário "${confirmDeleteUser?.name}" será excluído. Esta ação poderá ser desfeita por alguns segundos.`}
+          onConfirm={executeDelete}
+          confirmLabel="Excluir"
+          destructive
+        />
+
         <UserFormDialog
           user={formUser}
           open={formOpen}
           onOpenChange={setFormOpen}
-        />
-
-        <ConfirmDialog
-          open={!!deleteTarget}
-          onOpenChange={(o) => !o && setDeleteTarget(null)}
-          title="Excluir usuário?"
-          description={`O usuário "${deleteTarget?.name}" será permanentemente removido do sistema. Essa ação não pode ser desfeita.`}
-          onConfirm={executeDelete}
-          confirmLabel="Excluir"
-          destructive
         />
       </div>
     </TooltipProvider>

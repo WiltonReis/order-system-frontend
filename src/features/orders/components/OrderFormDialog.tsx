@@ -41,7 +41,7 @@ interface Line {
 
 export function OrderFormDialog({ open, onOpenChange, onSaved, order }: Props) {
   const { user } = useAuth();
-  const isAdmin = user?.role === "ADMIN";
+  const isAdmin = user?.role === "ADMIN" || user?.role === "ADMIN_MASTER";
   const isEdit = !!order;
 
   const [products, setProducts] = useState<Product[]>([]);

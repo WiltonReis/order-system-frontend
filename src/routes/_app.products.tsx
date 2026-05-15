@@ -6,12 +6,13 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/features/auth/context/AuthContext";
 import { brl } from "@/lib/format";
-import { extractErrorMessage, resolveImageUrl } from "@/lib/api";
+import { resolveImageUrl } from "@/lib/api";
 import { deleteProduct, listProductsPaged } from "@/features/products/api/productService";
 import { ProductDetailsDialog } from "@/features/products/components/ProductDetailsDialog";
 import { ProductFormDialog } from "@/features/products/components/ProductFormDialog";
-import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import { usePagination } from "@/shared/hooks/usePagination";
+import { showUndoToast } from "@/shared/components/UndoToast";
+import { ConfirmDialog } from "@/shared/components/ConfirmDialog";
 import type { Product } from "@/lib/types";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
@@ -41,7 +42,8 @@ function ProductsPage() {
   const [formProduct, setFormProduct] = useState<Product | null>(null);
   const [detailsProduct, setDetailsProduct] = useState<Product | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [confirmDeleteProduct, setConfirmDeleteProduct] = useState<Product | null>(null);
 
   const openCreate = () => {
     setFormProduct(null);
@@ -58,16 +60,40 @@ function ProductsPage() {
     setDetailsOpen(true);
   };
 
-  const executeDelete = async () => {
-    if (!deleteTarget) return;
-    try {
-      await deleteProduct(deleteTarget.id);
-      toast.success("Produto excluído");
-      setDeleteTarget(null);
-      invalidate();
-    } catch (e) {
-      toast.error(extractErrorMessage(e, "Erro ao excluir produto"));
-    }
+  const handleDelete = (p: Product) => {
+    setDetailsOpen(false);
+    setConfirmDeleteProduct(p);
+  };
+
+  const executeDelete = () => {
+    const p = confirmDeleteProduct;
+    if (!p) return;
+    setConfirmDeleteProduct(null);
+    setPendingIds((prev) => new Set([...prev, p.id]));
+    showUndoToast(
+      `Produto "${p.name}" excluído`,
+      async () => {
+        try {
+          await deleteProduct(p.id);
+          await invalidate();
+        } catch {
+          toast.error(`Erro ao excluir "${p.name}"`);
+          await invalidate();
+        }
+        setPendingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(p.id);
+          return next;
+        });
+      },
+      () => {
+        setPendingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(p.id);
+          return next;
+        });
+      },
+    );
   };
 
   return (
@@ -91,7 +117,7 @@ function ProductsPage() {
         <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
           {isPending ? (
             <div className="p-10 text-center text-sm text-muted-foreground">Carregando...</div>
-          ) : products.length === 0 ? (
+          ) : products.filter((p) => !pendingIds.has(p.id)).length === 0 ? (
             <div className="flex flex-col items-center gap-2 p-12 text-center">
               <Package className="h-8 w-8 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">Nenhum produto cadastrado.</p>
@@ -99,7 +125,7 @@ function ProductsPage() {
           ) : (
             <>
               <div className="grid grid-cols-5 gap-4 p-6">
-                {products.map((p) => (
+                {products.filter((p) => !pendingIds.has(p.id)).map((p) => (
                   <div key={p.id} className="flex flex-col gap-3 rounded-lg border border-border bg-muted/50 p-4 hover:bg-muted/70 transition-colors">
                     <div className="aspect-square overflow-hidden rounded bg-muted">
                       {resolveImageUrl(p.imageUrl) ? (
@@ -136,7 +162,7 @@ function ProductsPage() {
                           </Tooltip>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" aria-label="Excluir produto" onClick={() => setDeleteTarget(p)}>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 hover:text-destructive" aria-label="Excluir produto" onClick={() => handleDelete(p)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </TooltipTrigger>
@@ -192,14 +218,14 @@ function ProductsPage() {
           product={detailsProduct}
           isAdmin={isAdmin}
           onEdit={openEdit}
-          onDelete={setDeleteTarget}
+          onDelete={handleDelete}
         />
 
         <ConfirmDialog
-          open={!!deleteTarget}
-          onOpenChange={(o) => !o && setDeleteTarget(null)}
+          open={!!confirmDeleteProduct}
+          onOpenChange={(o) => !o && setConfirmDeleteProduct(null)}
           title="Excluir produto?"
-          description={`O produto "${deleteTarget?.name}" será permanentemente removido do catálogo. Essa ação não pode ser desfeita.`}
+          description={`O produto "${confirmDeleteProduct?.name}" será excluído. Esta ação poderá ser desfeita por alguns segundos.`}
           onConfirm={executeDelete}
           confirmLabel="Excluir"
           destructive

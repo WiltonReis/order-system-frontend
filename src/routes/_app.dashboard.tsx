@@ -151,7 +151,7 @@ function DateRangePicker({ value, onApply, onClear }: DateRangePickerProps) {
       </PopoverTrigger>
 
       <PopoverContent
-        align="start"
+        align="end"
         sideOffset={8}
         className="w-72 p-0 shadow-lg"
       >

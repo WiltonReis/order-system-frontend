@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { createFileRoute, useNavigate, Navigate, Link } from "@tanstack/react-router";
 import { Package } from "lucide-react";
 import { useAuth } from "@/features/auth/context/AuthContext";
+import { extractErrorMessage } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,7 +37,7 @@ function LoginPage() {
       await login(values.email.trim(), values.password);
       navigate({ to: "/orders" });
     } catch (err) {
-      setError("root", { message: err instanceof Error ? err.message : "Erro ao entrar" });
+      setError("root", { message: extractErrorMessage(err, "Erro ao entrar") });
     }
   };
 
